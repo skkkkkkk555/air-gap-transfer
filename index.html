@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AERO-BEAM Ultra — 高速視覚光エアギャップ通信システム</title>
+  
+  <!-- CDN Libraries: QRCode Generator & jsQR Decoder -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       CYBERPUNK AIR-GAP SECURE DESIGN SYSTEM
+       ========================================================================== */
+    :root {
+      --bg-dark: #070B12;
+      --bg-panel: #0E1626;
+      --bg-panel-trans: rgba(14, 22, 38, 0.92);
+      --bg-card: #131E33;
+      --border-cyan: rgba(0, 240, 255, 0.35);
+      --border-glow: rgba(0, 240, 255, 0.8);
+      
+      --cyan-primary: #00F0FF;
+      --green-matrix: #10B981;
+      --purple-verify: #A855F7;
+      --amber-warn: #F59E0B;
+      --red-alert: #EF4444;
+      
+      --text-main: #F8FAFC;
+      --text-sub: #94A3B8;
+      --text-dim: #64748B;
+      
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 0),
+        linear-gradient(to bottom, rgba(7, 11, 18, 0.9), var(--bg-dark));
+      background-size: 24px 24px, 100% 100%;
+    }
+
+    /* Scanline effect */
+    body::after {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 999;
+      pointer-events: none;
+      opacity: 0.25;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-dark); }
+    ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--cyan-primary); }
+
+    /* Top Navigation Header */
+    header {
+      background: var(--bg-panel-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-cyan);
+      padding: 12px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-title {
+      font-family: var(--font-mono);
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--cyan-primary);
+      text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      padding: 3px 8px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--green-matrix);
+      color: var(--green-matrix);
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pulse-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green-matrix);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--green-matrix);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-cyber {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 8px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-cyan);
+      color: var(--cyan-primary);
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.15);
+    }
+
+    .btn-cyber:hover {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--cyan-primary);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-cyber:active {
+      transform: translateY(1px);
+    }
+
+    .btn-cyber.success {
+      border-color: var(--green-matrix);
+      color: var(--green-matrix);
+    }
+    .btn-cyber.success:hover {
+      background: rgba(16, 185, 129, 0.2);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+    }
+
+    /* Mode Navigation Tabs */
+    .nav-tabs-wrapper {
+      width: 100%;
+      background: rgba(14, 22, 38, 0.95);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      display: flex;
+      justify-content: center;
+      padding: 8px 16px;
+      gap: 10px;
+    }
+
+    .nav-tab {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 10px 24px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-sub);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .nav-tab.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--cyan-primary);
+      color: var(--cyan-primary);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.3);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 16px 40px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Layout Grid */
+    .deck-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 880px) {
+      .deck-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Cyber Panel Card */
+    .cyber-panel {
+      background: var(--bg-panel-trans);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-cyan);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    }
+
+    .panel-title {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--cyan-primary);
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      background: rgba(0,0,0,0.4);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* Format Selector Pills */
+    .format-pills {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-card);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+
+    .pill-btn {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 5px 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .pill-btn.active {
+      background: var(--cyan-primary);
+      color: var(--bg-dark);
+      font-weight: 800;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+
+    /* Form Fields */
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .cyber-textarea {
+      width: 100%;
+      min-height: 105px;
+      background: rgba(7, 11, 18, 0.9);
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .cyber-textarea:focus {
+      border-color: var(--cyan-primary);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+    }
+
+    .char-counter-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-sub);
+    }
+
+    .preset-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .chip-btn {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: rgba(19, 30, 51, 0.8);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      color: var(--text-sub);
+      padding: 4px 10px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chip-btn:hover {
+      border-color: var(--cyan-primary);
+      color: var(--cyan-primary);
+      background: rgba(0, 240, 255, 0.08);
+    }
+
+    /* Controls Deck */
+    .control-row {
+      background: rgba(7, 11, 18, 0.7);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .control-value {
+      color: var(--cyan-primary);
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+    }
+
+    .cyber-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #1E293B;
+      outline: none;
+    }
+
+    .cyber-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--cyan-primary);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--cyan-primary);
+      border: 2px solid #FFFFFF;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .select-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .cyber-select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      padding: 8px 10px;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    /* Action Buttons */
+    .action-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn-main {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--cyan-primary);
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--cyan-primary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+    }
+
+    .btn-main:hover {
+      background: var(--cyan-primary);
+      color: var(--bg-dark);
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-danger {
+      border-color: var(--red-alert);
+      color: var(--red-alert);
+      background: rgba(239, 68, 68, 0.1);
+    }
+    .btn-danger:hover {
+      background: var(--red-alert);
+      color: #FFFFFF;
+      box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+    }
+
+    /* ==========================================================================
+       CLEAN OPTICAL PROJECTION SCREEN (NO OVERLAPPING TEXT OR HUD ON QR)
+       ========================================================================== */
+    .projection-deck {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .projection-info-bar {
+      width: 100%;
+      background: rgba(7, 11, 18, 0.9);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 6px;
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    /* Clean Pure White Container with Large Quiet Zone for Perfect Scanning */
+    .clean-qr-wrapper {
+      background: #FFFFFF;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 380px;
+      aspect-ratio: 1 / 1;
+      position: relative;
+    }
+
+    .clean-qr-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    /* ==========================================================================
+       RECEIVER DECK & SCANNER
+       ========================================================================== */
+    .scanner-viewport {
+      position: relative;
+      background: #000000;
+      border: 2px solid var(--border-cyan);
+      border-radius: 10px;
+      aspect-ratio: 4 / 3;
+      max-width: 500px;
+      width: 100%;
+      margin: 0 auto 14px auto;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+    }
+
+    .scanner-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .scanner-overlay-canvas {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
+
+    .laser-scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--cyan-primary);
+      box-shadow: 0 0 14px 3px var(--cyan-primary);
+      pointer-events: none;
+      animation: laserAnim 2.2s ease-in-out infinite alternate;
+      display: none;
+    }
+
+    @keyframes laserAnim {
+      0% { top: 5%; opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { top: 95%; opacity: 0.4; }
+    }
+
+    /* Verification Toggle Box */
+    .verify-switch-box {
+      background: rgba(168, 85, 247, 0.08);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .verify-switch-title {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--purple-verify);
+    }
+
+    .verify-switch-desc {
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    /* Switch UI */
+    .switch-ui {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .switch-ui input { opacity: 0; width: 0; height: 0; }
+    .slider-ui {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #1E293B;
+      border: 1px solid rgba(255,255,255,0.2);
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider-ui:before {
+      position: absolute; content: "";
+      height: 16px; width: 16px;
+      left: 3px; bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider-ui {
+      background-color: var(--purple-verify);
+      box-shadow: 0 0 10px var(--purple-verify);
+    }
+    input:checked + .slider-ui:before {
+      transform: translateX(20px);
+    }
+
+    /* Packet Matrix Tiles */
+    .matrix-section {
+      background: rgba(7, 11, 18, 0.7);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .matrix-title-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      margin-bottom: 10px;
+    }
+
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+      gap: 6px;
+      max-height: 130px;
+      overflow-y: auto;
+      padding: 6px;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .packet-tile {
+      aspect-ratio: 1 / 1;
+      background: #1E293B;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-dim);
+      transition: all 0.2s ease;
+    }
+
+    .packet-tile.received {
+      background: rgba(0, 240, 255, 0.25);
+      border-color: var(--cyan-primary);
+      color: var(--cyan-primary);
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.5);
+    }
+
+    .packet-tile.verified {
+      background: rgba(16, 185, 129, 0.35);
+      border-color: var(--green-matrix);
+      color: #FFFFFF;
+      box-shadow: 0 0 10px var(--green-matrix);
+    }
+
+    /* Progress Bars */
+    .progress-bar-container {
+      margin-bottom: 10px;
+    }
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      margin-bottom: 4px;
+    }
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      background: #1E293B;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan-primary), var(--green-matrix));
+      border-radius: 4px;
+      box-shadow: 0 0 12px var(--cyan-primary);
+      transition: width 0.15s ease-out;
+    }
+    .progress-fill.verify-fill {
+      background: linear-gradient(90deg, var(--purple-verify), var(--green-matrix));
+      box-shadow: 0 0 12px var(--purple-verify);
+    }
+
+    /* Restored Result Deck */
+    .result-panel {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid var(--green-matrix);
+      border-radius: 10px;
+      padding: 16px;
+      margin-top: 14px;
+      display: none;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.2);
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .result-badge {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--green-matrix);
+    }
+
+    .result-tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .result-tab-btn {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-sub);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .result-tab-btn.active {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: var(--green-matrix);
+      color: var(--green-matrix);
+    }
+
+    .result-content-area {
+      background: rgba(7, 11, 18, 0.95);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      max-height: 180px;
+      overflow-y: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .result-stats-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-bottom: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(4, 7, 13, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 12px;
+      max-width: 420px;
+      width: 100%;
+      padding: 22px;
+      box-shadow: 0 0 35px rgba(0, 240, 255, 0.3);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .modal-title {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--cyan-primary);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .modal-qr-container {
+      background: #FFFFFF;
+      padding: 16px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 14px auto;
+      width: 220px;
+      height: 220px;
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(14, 22, 38, 0.95);
+      border: 1px solid var(--cyan-primary);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 10px 20px;
+      border-radius: 30px;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+    }
+    .toast-container.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================
+       TOP NAVIGATION BAR
+       ========================================== -->
+  <header>
+    <div class="brand-section">
+      <div class="brand-title">
+        <span>⚡ AERO-BEAM</span>
+        <span style="font-size: 0.75rem; color: var(--text-sub); font-weight: 400;">ULTRA</span>
+      </div>
+      <div class="brand-badge">
+        <span class="pulse-dot"></span>
+        <span>ZERO NETWORK AIR-GAP</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn-cyber" id="btnOpenMobileModal">
+        <span>📱 スマホで開く</span>
+      </button>
+      <button class="btn-cyber" id="btnToggleSound" title="音声効果切替">
+        <span id="soundIcon">🔊</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MODE SWITCHER TABS -->
+  <div class="nav-tabs-wrapper">
+    <button class="nav-tab active" id="tabTransmit" onclick="switchMode('TRANSMIT')">
+      <span>📤 TRANSMIT (送信モード)</span>
+    </button>
+    <button class="nav-tab" id="tabReceive" onclick="switchMode('RECEIVE')">
+      <span>📥 RECEIVE (受信モード)</span>
+    </button>
+  </div>
+
+  <!-- ==========================================
+       MAIN WORKSPACE
+       ========================================== -->
+  <main>
+    
+    <!-- TRANSMIT VIEW DECK -->
+    <div id="deckTransmit" class="deck-grid">
+      
+      <!-- LEFT: MESSAGE INPUT & CONTROLS -->
+      <div class="cyber-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>⚡ BEAM GENERATOR</span>
+          </div>
+          <div class="format-pills">
+            <button class="pill-btn active" id="pillFormatQR" onclick="setTransmitFormat('QR')">QRストリーム</button>
+            <button class="pill-btn" id="pillFormatColor" onclick="setTransmitFormat('COLOR')">カラーマトリクス</button>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-group">
+          <textarea id="txInputText" class="cyber-textarea" placeholder="転送したいテキスト・機密データ・暗号鍵を入力..." oninput="updateTxStats()"></textarea>
+          <div class="char-counter-bar">
+            <span id="txStatsCount">CHARS: 0 | 0 BYTES</span>
+            <span id="txStatsPackets" style="color: var(--cyan-primary);">EST. PACKETS: 0</span>
+          </div>
+        </div>
+
+        <!-- Presets -->
+        <div class="preset-chips">
+          <button class="chip-btn" onclick="applyPreset('wifi')">📶 Wi-Fi設定</button>
+          <button class="chip-btn" onclick="applyPreset('key')">🔑 256-bit暗号鍵</button>
+          <button class="chip-btn" onclick="applyPreset('memo')">📝 機密メモ</button>
+          <button class="chip-btn" onclick="applyPreset('stress')">⚡ 大容量ストレステスト</button>
+          <button class="chip-btn" onclick="clearTxInput()" style="margin-left: auto; color: var(--red-alert);">🗑️ クリア</button>
+        </div>
+
+        <!-- Speed & Protocol Settings -->
+        <div class="control-row">
+          <div class="control-header">
+            <span>TRANSMIT SPEED (FPS)</span>
+            <span class="control-value" id="fpsDisplay">8 FPS (125ms/frame)</span>
+          </div>
+          <input type="range" id="fpsSlider" class="cyber-slider" min="1" max="30" value="8" step="1" oninput="onFpsSliderChange(this.value)">
+          
+          <div class="options-grid">
+            <div>
+              <label class="select-label">チャンクサイズ (パケット長)</label>
+              <select id="chunkSizeSelect" class="cyber-select" onchange="onChunkSizeChange()">
+                <option value="35">35 bytes (超高認識率・短焦点)</option>
+                <option value="50" selected>50 bytes (標準・推奨)</option>
+                <option value="90">90 bytes (高速・大容量)</option>
+                <option value="150">150 bytes (極限転送レート)</option>
+              </select>
+            </div>
+            <div>
+              <label class="select-label">ループ再生</label>
+              <select id="loopSelect" class="cyber-select">
+                <option value="true" selected>ループ送信 (推奨)</option>
+                <option value="false">1回のみ送信</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Start / Stop Actions -->
+        <div class="action-toolbar">
+          <button class="btn-main" id="btnStartBeam" onclick="startBeamTransmission()">
+            <span>⚡ START BEAM (送信開始)</span>
+          </button>
+          <button class="btn-cyber" id="btnPauseBeam" onclick="togglePauseBeam()" style="display: none;">
+            <span>⏸ PAUSE</span>
+          </button>
+          <button class="btn-cyber btn-danger" id="btnStopBeam" onclick="stopBeamTransmission()" style="display: none;">
+            <span>⏹ RESET</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: PURE CLEAN OPTICAL PROJECTION SCREEN -->
+      <div class="cyber-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📺 OPTICAL PROJECTION SCREEN</span>
+          </div>
+          <span class="panel-tag" id="txStatusTag">STANDBY</span>
+        </div>
+
+        <div class="projection-deck">
+          <!-- Top Telemetry Bar (Separated from QR code) -->
+          <div class="projection-info-bar">
+            <span id="txFrameInfo" style="color: var(--cyan-primary); font-weight: 700;">FRAME: -- / --</span>
+            <span id="txSessionInfo">ID: ----</span>
+            <span id="txRateInfo">0.0 FPS</span>
+          </div>
+
+          <!-- Pure Clean White QR Container (No overlays on top of the QR code) -->
+          <div class="clean-qr-wrapper">
+            <canvas id="txCanvas" class="clean-qr-canvas" width="400" height="400"></canvas>
+          </div>
+
+          <!-- Cycle Progress Bar -->
+          <div class="progress-bar-container" style="width: 100%;">
+            <div class="progress-labels">
+              <span>BEAM CYCLE PROGRESS</span>
+              <span id="txCycleProgressText">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="txProgressFill" class="progress-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==========================================
+         RECEIVE VIEW DECK
+         ========================================== -->
+    <div id="deckReceive" class="deck-grid" style="display: none;">
+      
+      <!-- LEFT: CAMERA SCANNER VIEWPORT -->
+      <div class="cyber-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>📷 OPTICAL SENSOR HUD</span>
+          </div>
+          <span class="panel-tag" id="rxCameraStatus">CAMERA: IDLE</span>
+        </div>
+
+        <!-- 3-Pass Redundancy Switch -->
+        <div class="verify-switch-box">
+          <div>
+            <div class="verify-switch-title">
+              <span>🛡️ 3重照合・誤り補正モード</span>
+            </div>
+            <div class="verify-switch-desc">
+              全パケットを3回読み取り多数決検証。読み取りミス・ブレを自動完全補正
+            </div>
+          </div>
+          <label class="switch-ui">
+            <input type="checkbox" id="chk3PassMode" checked onchange="toggle3PassMode(this.checked)">
+            <span class="slider-ui"></span>
+          </label>
+        </div>
+
+        <!-- Camera Scanner View -->
+        <div class="scanner-viewport">
+          <video id="rxVideo" class="scanner-video" playsinline muted></video>
+          <canvas id="rxOverlayCanvas" class="scanner-overlay-canvas"></canvas>
+          <div id="rxLaserLine" class="laser-scan-line"></div>
+        </div>
+
+        <!-- Camera Controls -->
+        <div class="action-toolbar">
+          <button class="btn-main" id="btnToggleCamera" onclick="toggleCamera()">
+            <span>📷 カメラ起動</span>
+          </button>
+          <button class="btn-cyber" id="btnFlipCamera" onclick="flipCamera()">
+            <span>🔄 前面/背面切替</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: PACKET MATRIX & RESTORATION DECK -->
+      <div class="cyber-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>🧩 PACKET MATRIX & DECODER</span>
+          </div>
+          <span class="panel-tag" id="rxSessionTag">WAITING SIGNAL...</span>
+        </div>
+
+        <!-- Packet Tiles -->
+        <div class="matrix-section">
+          <div class="matrix-title-bar">
+            <span>PACKET BITMAP TILES</span>
+            <span id="matrixStatsText" style="color: var(--cyan-primary);">0 / 0 PACKETS</span>
+          </div>
+          <div id="packetMatrixGrid" class="matrix-grid">
+            <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); font-size: 0.75rem; padding: 20px 0; font-family: var(--font-mono);">
+              カメラを送信画面にかざすとパケットを自動認識します
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress 1: Packet Collection -->
+        <div class="progress-bar-container">
+          <div class="progress-labels">
+            <span>PACKET SYNC PROGRESS</span>
+            <span id="rxPacketProgressText">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="rxPacketProgressFill" class="progress-fill"></div>
+          </div>
+        </div>
+
+        <!-- Progress 2: 3-Pass Redundancy -->
+        <div class="progress-bar-container" id="rxVerifyProgressContainer">
+          <div class="progress-labels">
+            <span style="color: var(--purple-verify);">3-PASS VERIFICATION</span>
+            <span id="rxVerifyProgressText" style="color: var(--purple-verify);">0/3 (0%)</span>
+          </div>
+          <div class="progress-track">
+            <div id="rxVerifyProgressFill" class="progress-fill verify-fill"></div>
+          </div>
+        </div>
+
+        <!-- Reassembly Result Area -->
+        <div id="rxResultPanel" class="result-panel">
+          <div class="result-header">
+            <div class="result-badge">
+              <span>✅ DATA RESTORED & VERIFIED</span>
+            </div>
+            <div class="result-tabs">
+              <button class="result-tab-btn active" id="btnResultTabText" onclick="switchResultTab('TEXT')">TEXT</button>
+              <button class="result-tab-btn" id="btnResultTabHex" onclick="switchResultTab('HEX')">HEX DUMP</button>
+            </div>
+          </div>
+
+          <!-- Restored Text / Hex Area -->
+          <div id="rxResultContent" class="result-content-area"></div>
+
+          <!-- Stats -->
+          <div class="result-stats-row">
+            <div>CHARS: <b id="statChars" style="color: var(--text-main);">0</b></div>
+            <div>BYTES: <b id="statBytes" style="color: var(--text-main);">0</b></div>
+            <div>PACKETS: <b id="statPackets" style="color: var(--text-main);">0</b></div>
+            <div>TIME: <b id="statTime" style="color: var(--text-main);">0.0s</b></div>
+            <div>CRC16: <b style="color: var(--green-matrix);">VALID</b></div>
+          </div>
+
+          <!-- Actions -->
+          <div class="action-toolbar">
+            <button class="btn-main success" onclick="shareRestoredData()">
+              <span>🔗 アプリで共有 (Share)</span>
+            </button>
+            <button class="btn-cyber" onclick="copyRestoredData()">
+              <span>📋 コピー</span>
+            </button>
+            <button class="btn-cyber btn-danger" onclick="resetReceiver()">
+              <span>🔄 新規スキャン</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ==========================================
+       MOBILE CONNECT MODAL
+       ========================================== -->
+  <div id="mobileConnectModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">📱 スマホで開く</div>
+        <button class="modal-close" onclick="closeMobileModal()">&times;</button>
+      </div>
+      
+      <p style="font-size: 0.8rem; color: var(--text-sub); text-align: center; line-height: 1.5; margin-bottom: 10px;">
+        スマホの標準カメラでスキャンすると、即座に受信機・送信機として開きます。
+      </p>
+
+      <div class="modal-qr-container">
+        <div id="mobileModalQrTarget"></div>
+      </div>
+
+      <div style="margin-top: 10px;">
+        <label class="select-label">URL (ローカルIP変更可能)</label>
+        <div style="display: flex; gap: 6px;">
+          <input type="text" id="customUrlInput" class="cyber-textarea" style="min-height: 38px; padding: 6px 10px; font-size: 0.75rem;" />
+          <button class="btn-cyber" onclick="regenerateMobileQr()" style="padding: 0 12px;">更新</button>
+        </div>
+      </div>
+
+      <button class="btn-main" onclick="closeMobileModal()" style="margin-top: 16px;">
+        閉じる
+      </button>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast-container">
+    <span id="toastMsg">通知メッセージ</span>
+  </div>
+
+  <!-- ==========================================================================
+       ROBUST APPLICATION LOGIC
+       ========================================================================== -->
+  <script>
+    /* --------------------------------------------------------------------------
+       1. GLOBAL STATE & SOUND ENGINE
+       -------------------------------------------------------------------------- */
+    const STATE = {
+      mode: 'TRANSMIT',
+      transmitFormat: 'QR',
+      fps: 8,                       // Default 8 FPS for highly reliable camera scan
+      chunkSize: 50,                // Default 50 bytes (coarse, easily scanned QR modules)
+      isLoop: true,
+      is3PassMode: true,
+      soundEnabled: true,
+      
+      // Transmit runtime
+      txTimer: null,
+      txPackets: [],
+      txCanvases: [],
+      txCurrentIndex: 0,
+      txIsRunning: false,
+      txIsPaused: false,
+      txSessionId: '',
+      txLastFrameTime: 0,
+      
+      // Receive runtime
+      rxStream: null,
+      rxFacingMode: 'environment',
+      rxIsScanning: false,
+      rxSession: null,
+      rxDecodedText: '',
+      
+      // Dedicated Scan Buffer Canvas (Reused to prevent GC lag)
+      scanBufferCanvas: document.createElement('canvas')
+    };
+
+    // Web Audio Synthesizer
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playSound(type) {
+      if (!STATE.soundEnabled) return;
+      try {
+        initAudio();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const now = audioCtx.currentTime;
+
+        if (type === 'tick') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1000, now);
+          osc.frequency.exponentialRampToValueAtTime(1600, now + 0.03);
+          gain.gain.setValueAtTime(0.06, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.03);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.03);
+        } else if (type === 'success') {
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+          notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + i * 0.07);
+            gain.gain.setValueAtTime(0.12, now + i * 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.07);
+            osc.stop(now + i * 0.07 + 0.2);
+          });
+        }
+      } catch (e) {
+        console.warn('Audio SE error:', e);
+      }
+    }
+
+    /* --------------------------------------------------------------------------
+       2. PROTOCOL & CHECKSUM (CRC16 + UTF8 BASE64)
+       -------------------------------------------------------------------------- */
+    function calcCRC16(str) {
+      const bytes = new TextEncoder().encode(str);
+      let crc = 0xFFFF;
+      for (let i = 0; i < bytes.length; i++) {
+        crc ^= (bytes[i] << 8);
+        for (let j = 0; j < 8; j++) {
+          if (crc & 0x8000) {
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+          } else {
+            crc = (crc << 1) & 0xFFFF;
+          }
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function generateSessionId() {
+      return Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    /* --------------------------------------------------------------------------
+       3. BULLET-PROOF QR GENERATOR (Ensures Large Quiet Zone & Zero Overlap)
+       -------------------------------------------------------------------------- */
+    function generateCleanQrCanvas(text, size = 340) {
+      return new Promise((resolve) => {
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.top = '-9999px';
+        document.body.appendChild(container);
+
+        new QRCode(container, {
+          text: text,
+          width: size,
+          height: size,
+          colorDark: "#000000",
+          colorLight: "#FFFFFF",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        // Polling check until canvas or image is fully rendered
+        let tries = 0;
+        const checkTimer = setInterval(() => {
+          tries++;
+          const cvs = container.querySelector('canvas');
+          const img = container.querySelector('img');
+
+          if (cvs && cvs.width > 0) {
+            clearInterval(checkTimer);
+            const finalCvs = document.createElement('canvas');
+            const pad = 30; // 30px pure white quiet zone
+            finalCvs.width = size + pad * 2;
+            finalCvs.height = size + pad * 2;
+            const ctx = finalCvs.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, finalCvs.width, finalCvs.height);
+            ctx.drawImage(cvs, pad, pad, size, size);
+            document.body.removeChild(container);
+            resolve(finalCvs);
+          } else if (img && img.complete && img.naturalWidth > 0) {
+            clearInterval(checkTimer);
+            const finalCvs = document.createElement('canvas');
+            const pad = 30;
+            finalCvs.width = size + pad * 2;
+            finalCvs.height = size + pad * 2;
+            const ctx = finalCvs.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, finalCvs.width, finalCvs.height);
+            ctx.drawImage(img, pad, pad, size, size);
+            document.body.removeChild(container);
+            resolve(finalCvs);
+          } else if (tries > 40) {
+            clearInterval(checkTimer);
+            if (container.parentNode) document.body.removeChild(container);
+            const fallback = document.createElement('canvas');
+            fallback.width = 400; fallback.height = 400;
+            resolve(fallback);
+          }
+        }, 15);
+      });
+    }
+
+    function renderColorMatrixToCanvas(packetStr, index, total, sessionId) {
+      const cvs = document.createElement('canvas');
+      cvs.width = 400;
+      cvs.height = 400;
+      const ctx = cvs.getContext('2d');
+
+      // Pure White Background
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+      const palette = [
+        '#000000', '#00F0FF', '#10B981', '#F59E0B',
+        '#EF4444', '#A855F7', '#EC4899', '#3B82F6',
+        '#14B8A6', '#84CC16', '#EAB308', '#F97316',
+        '#06B6D4', '#8B5CF6', '#D946EF', '#64748B'
+      ];
+
+      const cols = 8;
+      const rows = 8;
+      const cellSize = 36;
+      const startX = (cvs.width - (cols * cellSize)) / 2;
+      const startY = (cvs.height - (rows * cellSize)) / 2;
+
+      const bytes = new TextEncoder().encode(packetStr);
+      let byteIdx = 0;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = startX + (c * cellSize);
+          const y = startY + (r * cellSize);
+          const val = byteIdx < bytes.length ? bytes[byteIdx++] : 0;
+          ctx.fillStyle = palette[val % palette.length];
+          ctx.fillRect(x + 2, y + 2, cellSize - 4, cellSize - 4);
+        }
+      }
+
+      // Border frame
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(startX, startY, cols * cellSize, rows * cellSize);
+
+      return cvs;
+    }
+
+    /* --------------------------------------------------------------------------
+       4. TRANSMIT ENGINE
+       -------------------------------------------------------------------------- */
+    function updateTxStats() {
+      const text = document.getElementById('txInputText').value;
+      const bytes = new TextEncoder().encode(text).length;
+      const chunkSize = parseInt(document.getElementById('chunkSizeSelect').value, 10);
+      const packets = text.length > 0 ? Math.ceil(bytes / chunkSize) : 0;
+      
+      document.getElementById('txStatsCount').innerText = `CHARS: ${text.length} | ${bytes} BYTES`;
+      document.getElementById('txStatsPackets').innerText = `EST. PACKETS: ${packets}`;
+    }
+
+    function onFpsSliderChange(val) {
+      STATE.fps = parseInt(val, 10);
+      const ms = (1000 / STATE.fps).toFixed(1);
+      document.getElementById('fpsDisplay').innerText = `${STATE.fps} FPS (${ms}ms/frame)`;
+    }
+
+    function onChunkSizeChange() {
+      updateTxStats();
+      if (STATE.txIsRunning) startBeamTransmission();
+    }
+
+    function setTransmitFormat(fmt) {
+      STATE.transmitFormat = fmt;
+      document.getElementById('pillFormatQR').classList.toggle('active', fmt === 'QR');
+      document.getElementById('pillFormatColor').classList.toggle('active', fmt === 'COLOR');
+      if (STATE.txIsRunning) startBeamTransmission();
+    }
+
+    function applyPreset(type) {
+      const input = document.getElementById('txInputText');
+      if (type === 'wifi') {
+        input.value = "WIFI:S:CYBER_NET_5G;T:WPA;P:AeroBeamSecretKey2026;H:false;;";
+      } else if (type === 'key') {
+        input.value = "secp256k1:04a2f89d31b7e42d87e0c9d1a5f64b82c3e10d9f8a7b6c5d4e3f2a1b0c9d8e7f1234567890abcdef";
+      } else if (type === 'memo') {
+        input.value = "【機密メモ】\n・視覚光エアギャップ通信システム稼働中。\n・完全オフライン環境にてデータ転送成功。";
+      } else if (type === 'stress') {
+        let longStr = "AERO-BEAM ULTRA HIGH-SPEED OPTICAL STREAM TEST\n";
+        for (let i = 1; i <= 10; i++) {
+          longStr += `LINE_${String(i).padStart(2, '0')}: Optical air-gap packet transmission.\n`;
+        }
+        input.value = longStr.trim();
+      }
+      updateTxStats();
+      showToast('プリセットを適用しました');
+    }
+
+    function clearTxInput() {
+      document.getElementById('txInputText').value = '';
+      updateTxStats();
+      stopBeamTransmission();
+    }
+
+    async function preparePackets(text) {
+      const chunkSize = parseInt(document.getElementById('chunkSizeSelect').value, 10);
+      const encodedBytes = new TextEncoder().encode(text);
+      const chunks = [];
+      for (let i = 0; i < encodedBytes.length; i += chunkSize) {
+        chunks.push(encodedBytes.slice(i, i + chunkSize));
+      }
+      const total = chunks.length;
+      const sessionId = generateSessionId();
+      STATE.txSessionId = sessionId;
+
+      const packets = [];
+      const canvases = [];
+
+      for (let idx = 0; idx < total; idx++) {
+        let binaryChunk = '';
+        for (let b = 0; b < chunks[idx].length; b++) {
+          binaryChunk += String.fromCharCode(chunks[idx][b]);
+        }
+        const b64 = btoa(binaryChunk);
+        const modeStr = STATE.transmitFormat;
+        const body = `${modeStr}|${sessionId}|${idx}|${total}|${b64}`;
+        const crc = calcCRC16(body);
+        const packetStr = `AB2|${body}|${crc}`;
+        packets.push({ raw: packetStr, index: idx, total: total, sessionId: sessionId });
+
+        if (STATE.transmitFormat === 'QR') {
+          const cvs = await generateCleanQrCanvas(packetStr, 340);
+          canvases.push(cvs);
+        } else {
+          const cvs = renderColorMatrixToCanvas(packetStr, idx, total, sessionId);
+          canvases.push(cvs);
+        }
+      }
+
+      return { packets, canvases, total, sessionId };
+    }
+
+    async function startBeamTransmission() {
+      const text = document.getElementById('txInputText').value.trim();
+      if (!text) {
+        showToast('送信するメッセージを入力してください');
+        return;
+      }
+
+      showToast('パケット生成中...');
+      const { packets, canvases, total, sessionId } = await preparePackets(text);
+      if (total === 0) return;
+
+      STATE.txPackets = packets;
+      STATE.txCanvases = canvases;
+      STATE.txCurrentIndex = 0;
+      STATE.txIsRunning = true;
+      STATE.txIsPaused = false;
+
+      // Update UI Controls
+      document.getElementById('btnStartBeam').style.display = 'none';
+      document.getElementById('btnPauseBeam').style.display = 'inline-flex';
+      document.getElementById('btnStopBeam').style.display = 'inline-flex';
+      document.getElementById('txStatusTag').innerText = 'TRANSMITTING';
+      document.getElementById('txStatusTag').style.color = 'var(--cyan-primary)';
+
+      STATE.txLastFrameTime = performance.now();
+      runTransmitLoop();
+      showToast(`⚡ 送信開始: 全${total}パケット @ ${STATE.fps} FPS`);
+    }
+
+    function runTransmitLoop(timestamp) {
+      if (!STATE.txIsRunning) return;
+
+      if (!STATE.txIsPaused && STATE.txCanvases.length > 0) {
+        const now = timestamp || performance.now();
+        const interval = 1000 / STATE.fps;
+        const delta = now - STATE.txLastFrameTime;
+
+        if (delta >= interval) {
+          STATE.txLastFrameTime = now - (delta % interval);
+
+          // Draw current frame to pure screen canvas
+          const mainCanvas = document.getElementById('txCanvas');
+          const ctx = mainCanvas.getContext('2d');
+          const cachedCanvas = STATE.txCanvases[STATE.txCurrentIndex];
+          ctx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+          ctx.drawImage(cachedCanvas, 0, 0, mainCanvas.width, mainCanvas.height);
+
+          // Update Separated Telemetry Bar
+          const idx = STATE.txCurrentIndex;
+          const total = STATE.txCanvases.length;
+          document.getElementById('txFrameInfo').innerText = `FRAME: ${String(idx + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
+          document.getElementById('txSessionInfo').innerText = `ID: #${STATE.txSessionId}`;
+          document.getElementById('txRateInfo').innerText = `${STATE.fps} FPS`;
+
+          // Progress
+          const pct = Math.round(((idx + 1) / total) * 100);
+          document.getElementById('txProgressFill').style.width = `${pct}%`;
+          document.getElementById('txCycleProgressText').innerText = `${pct}%`;
+
+          // Next packet
+          STATE.txCurrentIndex++;
+          if (STATE.txCurrentIndex >= total) {
+            const isLoop = document.getElementById('loopSelect').value === 'true';
+            if (isLoop) {
+              STATE.txCurrentIndex = 0;
+            } else {
+              stopBeamTransmission();
+              showToast('1サイクルの送信が完了しました');
+              return;
+            }
+          }
+        }
+      }
+
+      STATE.txTimer = requestAnimationFrame(runTransmitLoop);
+    }
+
+    function togglePauseBeam() {
+      STATE.txIsPaused = !STATE.txIsPaused;
+      const btn = document.getElementById('btnPauseBeam');
+      if (STATE.txIsPaused) {
+        btn.innerHTML = '<span>▶ RESUME</span>';
+        document.getElementById('txStatusTag').innerText = 'PAUSED';
+        document.getElementById('txStatusTag').style.color = 'var(--amber-warn)';
+      } else {
+        btn.innerHTML = '<span>⏸ PAUSE</span>';
+        document.getElementById('txStatusTag').innerText = 'TRANSMITTING';
+        document.getElementById('txStatusTag').style.color = 'var(--cyan-primary)';
+      }
+    }
+
+    function stopBeamTransmission() {
+      STATE.txIsRunning = false;
+      STATE.txIsPaused = false;
+      if (STATE.txTimer) {
+        cancelAnimationFrame(STATE.txTimer);
+        STATE.txTimer = null;
+      }
+
+      document.getElementById('btnStartBeam').style.display = 'inline-flex';
+      document.getElementById('btnPauseBeam').style.display = 'none';
+      document.getElementById('btnStopBeam').style.display = 'none';
+      document.getElementById('txStatusTag').innerText = 'STANDBY';
+      document.getElementById('txStatusTag').style.color = 'var(--text-dim)';
+      document.getElementById('txProgressFill').style.width = '0%';
+      document.getElementById('txCycleProgressText').innerText = '0%';
+
+      // Clear Canvas to pure white ready state
+      const canvas = document.getElementById('txCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0E1626';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('AERO-BEAM OPTICAL READY', canvas.width / 2, canvas.height / 2);
+
+      document.getElementById('txFrameInfo').innerText = 'FRAME: -- / --';
+      document.getElementById('txSessionInfo').innerText = 'ID: ----';
+      document.getElementById('txRateInfo').innerText = '0.0 FPS';
+    }
+
+    /* --------------------------------------------------------------------------
+       5. RECEIVE ENGINE (OPTIMIZED HIGH-SPEED SCANNER & 3-PASS CORRECTION)
+       -------------------------------------------------------------------------- */
+    class ReceiveSessionTracker {
+      constructor(sessionId, totalPackets, is3PassEnabled) {
+        this.sessionId = sessionId;
+        this.totalPackets = totalPackets;
+        this.is3PassEnabled = is3PassEnabled;
+        this.startTime = performance.now();
+        this.completed = false;
+        
+        this.slots = Array.from({ length: totalPackets }, () => ({
+          payloadMap: new Map(),
+          bestPayload: null,
+          hitCount: 0,
+          verified: false
+        }));
+      }
+
+      addPacket(index, payload) {
+        if (this.completed) return false;
+        if (index < 0 || index >= this.totalPackets) return false;
+
+        const slot = this.slots[index];
+        slot.hitCount++;
+        const count = (slot.payloadMap.get(payload) || 0) + 1;
+        slot.payloadMap.set(payload, count);
+
+        // Find majority
+        let maxCount = 0;
+        let best = null;
+        for (const [p, c] of slot.payloadMap.entries()) {
+          if (c > maxCount) {
+            maxCount = c;
+            best = p;
+          }
+        }
+        slot.bestPayload = best;
+
+        if (!this.is3PassEnabled) {
+          slot.verified = true;
+        } else {
+          if (maxCount >= 3) slot.verified = true;
+        }
+
+        const isAllDone = this.slots.every(s => this.is3PassEnabled ? s.verified : s.bestPayload !== null);
+        if (isAllDone && !this.completed) {
+          this.completed = true;
+          return true;
+        }
+        return false;
+      }
+
+      getStats() {
+        const receivedCount = this.slots.filter(s => s.bestPayload !== null).length;
+        const verifiedCount = this.slots.filter(s => s.verified).length;
+        const totalPassHits = this.slots.reduce((sum, s) => sum + Math.min(3, s.hitCount), 0);
+        const maxRequiredHits = this.totalPackets * 3;
+
+        return {
+          receivedCount,
+          verifiedCount,
+          totalPackets: this.totalPackets,
+          packetPercent: Math.round((receivedCount / this.totalPackets) * 100),
+          verifyPercent: this.is3PassEnabled 
+            ? Math.round((totalPassHits / maxRequiredHits) * 100) 
+            : Math.round((receivedCount / this.totalPackets) * 100),
+          passCount: Math.min(3, Math.floor(totalPassHits / Math.max(1, this.totalPackets)))
+        };
+      }
+
+      reassembleText() {
+        try {
+          let binaryCombined = '';
+          for (let i = 0; i < this.totalPackets; i++) {
+            const slot = this.slots[i];
+            if (!slot.bestPayload) return null;
+            binaryCombined += atob(slot.bestPayload);
+          }
+          const bytes = new Uint8Array(binaryCombined.length);
+          for (let i = 0; i < binaryCombined.length; i++) {
+            bytes[i] = binaryCombined.charCodeAt(i);
+          }
+          return new TextDecoder().decode(bytes);
+        } catch (e) {
+          console.error("Reassembly decode error:", e);
+          return null;
+        }
+      }
+    }
+
+    async function toggleCamera() {
+      if (STATE.rxIsScanning) {
+        stopCamera();
+      } else {
+        await startCamera();
+      }
+    }
+
+    async function startCamera() {
+      try {
+        const constraints = {
+          video: {
+            facingMode: STATE.rxFacingMode,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        STATE.rxStream = stream;
+        const video = document.getElementById('rxVideo');
+        video.srcObject = stream;
+        await video.play();
+
+        STATE.rxIsScanning = true;
+        document.getElementById('btnToggleCamera').innerHTML = '<span>⏹ カメラ停止</span>';
+        document.getElementById('btnToggleCamera').classList.add('btn-danger');
+        document.getElementById('rxCameraStatus').innerText = 'CAMERA: SCANNING';
+        document.getElementById('rxCameraStatus').style.color = 'var(--green-matrix)';
+        document.getElementById('rxLaserLine').style.display = 'block';
+
+        requestAnimationFrame(processScannerFrame);
+        showToast('📷 スキャナー稼働中');
+      } catch (err) {
+        console.error("Camera access error:", err);
+        showToast('❌ カメラを起動できませんでした。権限を確認してください');
+        document.getElementById('rxCameraStatus').innerText = 'CAMERA: ERROR';
+        document.getElementById('rxCameraStatus').style.color = 'var(--red-alert)';
+      }
+    }
+
+    function stopCamera() {
+      STATE.rxIsScanning = false;
+      if (STATE.rxStream) {
+        STATE.rxStream.getTracks().forEach(t => t.stop());
+        STATE.rxStream = null;
+      }
+      const video = document.getElementById('rxVideo');
+      video.srcObject = null;
+
+      document.getElementById('btnToggleCamera').innerHTML = '<span>📷 カメラ起動</span>';
+      document.getElementById('btnToggleCamera').classList.remove('btn-danger');
+      document.getElementById('rxCameraStatus').innerText = 'CAMERA: IDLE';
+      document.getElementById('rxCameraStatus').style.color = 'var(--text-dim)';
+      document.getElementById('rxLaserLine').style.display = 'none';
+
+      const canvas = document.getElementById('rxOverlayCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    async function flipCamera() {
+      STATE.rxFacingMode = STATE.rxFacingMode === 'environment' ? 'user' : 'environment';
+      if (STATE.rxIsScanning) {
+        stopCamera();
+        await startCamera();
+      }
+    }
+
+    function toggle3PassMode(enabled) {
+      STATE.is3PassMode = enabled;
+      document.getElementById('rxVerifyProgressContainer').style.display = enabled ? 'block' : 'none';
+      if (STATE.rxSession) {
+        STATE.rxSession.is3PassEnabled = enabled;
+        updateMatrixUI();
+      }
+      showToast(enabled ? '🛡️ 3重照合モード ON' : '⚡ 高速1-Passモード ON');
+    }
+
+    // High-Speed Frame Processing Loop (Downsampled to 640px for 60fps real-time decode)
+    function processScannerFrame() {
+      if (!STATE.rxIsScanning) return;
+
+      const video = document.getElementById('rxVideo');
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const overlayCanvas = document.getElementById('rxOverlayCanvas');
+        overlayCanvas.width = video.videoWidth;
+        overlayCanvas.height = video.videoHeight;
+        const overlayCtx = overlayCanvas.getContext('2d');
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+        // Optimal Scan Buffer (Resize to 640px width to ensure blazing fast jsQR decode without lag)
+        const targetWidth = Math.min(640, video.videoWidth);
+        const scale = targetWidth / video.videoWidth;
+        const targetHeight = Math.round(video.videoHeight * scale);
+
+        const scanCanvas = STATE.scanBufferCanvas;
+        scanCanvas.width = targetWidth;
+        scanCanvas.height = targetHeight;
+        const scanCtx = scanCanvas.getContext('2d');
+        scanCtx.drawImage(video, 0, 0, targetWidth, targetHeight);
+
+        const imageData = scanCtx.getImageData(0, 0, targetWidth, targetHeight);
+        const qrCode = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert"
+        });
+
+        if (qrCode) {
+          // Rescale coordinates back to video overlay size
+          const loc = {
+            topLeftCorner: { x: qrCode.location.topLeftCorner.x / scale, y: qrCode.location.topLeftCorner.y / scale },
+            topRightCorner: { x: qrCode.location.topRightCorner.x / scale, y: qrCode.location.topRightCorner.y / scale },
+            bottomRightCorner: { x: qrCode.location.bottomRightCorner.x / scale, y: qrCode.location.bottomRightCorner.y / scale },
+            bottomLeftCorner: { x: qrCode.location.bottomLeftCorner.x / scale, y: qrCode.location.bottomLeftCorner.y / scale }
+          };
+
+          drawTargetHUD(overlayCtx, loc);
+          handleScannedPacket(qrCode.data);
+        }
+      }
+
+      requestAnimationFrame(processScannerFrame);
+    }
+
+    function drawTargetHUD(ctx, location) {
+      ctx.beginPath();
+      ctx.moveTo(location.topLeftCorner.x, location.topLeftCorner.y);
+      ctx.lineTo(location.topRightCorner.x, location.topRightCorner.y);
+      ctx.lineTo(location.bottomRightCorner.x, location.bottomRightCorner.y);
+      ctx.lineTo(location.bottomLeftCorner.x, location.bottomLeftCorner.y);
+      ctx.closePath();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#00F0FF';
+      ctx.shadowColor = '#00F0FF';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+
+      const pts = [location.topLeftCorner, location.topRightCorner, location.bottomRightCorner, location.bottomLeftCorner];
+      pts.forEach(p => {
+        ctx.fillStyle = '#10B981';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function handleScannedPacket(rawStr) {
+      if (!rawStr.startsWith('AB2|')) return;
+
+      const parts = rawStr.split('|');
+      if (parts.length !== 7) return;
+
+      const [header, mode, sessId, idxStr, totStr, payloadB64, crcStr] = parts;
+      const index = parseInt(idxStr, 10);
+      const total = parseInt(totStr, 10);
+
+      // Verify CRC16
+      const calcBody = `${mode}|${sessId}|${idxStr}|${totStr}|${payloadB64}`;
+      if (calcCRC16(calcBody) !== crcStr) return;
+
+      // Session Tracking
+      if (!STATE.rxSession || STATE.rxSession.sessionId !== sessId) {
+        STATE.rxSession = new ReceiveSessionTracker(sessId, total, STATE.is3PassMode);
+        initMatrixGrid(total);
+        document.getElementById('rxSessionTag').innerText = `SESSION: #${sessId}`;
+        document.getElementById('rxSessionTag').style.color = 'var(--cyan-primary)';
+      }
+
+      const justCompleted = STATE.rxSession.addPacket(index, payloadB64);
+      playSound('tick');
+      updateMatrixUI();
+
+      if (justCompleted) {
+        onRestorationComplete();
+      }
+    }
+
+    function initMatrixGrid(total) {
+      const grid = document.getElementById('packetMatrixGrid');
+      grid.innerHTML = '';
+      for (let i = 0; i < total; i++) {
+        const tile = document.createElement('div');
+        tile.className = 'packet-tile';
+        tile.id = `matrixTile_${i}`;
+        tile.innerText = String(i + 1).padStart(2, '0');
+        grid.appendChild(tile);
+      }
+    }
+
+    function updateMatrixUI() {
+      if (!STATE.rxSession) return;
+
+      const stats = STATE.rxSession.getStats();
+
+      for (let i = 0; i < STATE.rxSession.totalPackets; i++) {
+        const slot = STATE.rxSession.slots[i];
+        const tile = document.getElementById(`matrixTile_${i}`);
+        if (!tile) continue;
+
+        if (slot.verified) {
+          tile.className = 'packet-tile verified';
+        } else if (slot.bestPayload !== null) {
+          tile.className = 'packet-tile received';
+        } else {
+          tile.className = 'packet-tile';
+        }
+      }
+
+      document.getElementById('matrixStatsText').innerText = `${stats.receivedCount} / ${stats.totalPackets} PACKETS`;
+      document.getElementById('rxPacketProgressFill').style.width = `${stats.packetPercent}%`;
+      document.getElementById('rxPacketProgressText').innerText = `${stats.packetPercent}%`;
+
+      if (STATE.is3PassMode) {
+        document.getElementById('rxVerifyProgressFill').style.width = `${stats.verifyPercent}%`;
+        document.getElementById('rxVerifyProgressText').innerText = `PASS ${stats.passCount}/3 (${stats.verifyPercent}%)`;
+      }
+    }
+
+    function onRestorationComplete() {
+      const restored = STATE.rxSession.reassembleText();
+      if (restored === null) {
+        showToast('❌ データ復元エラーが発生しました');
+        return;
+      }
+
+      STATE.rxDecodedText = restored;
+      playSound('success');
+
+      const elapsed = ((performance.now() - STATE.rxSession.startTime) / 1000).toFixed(2);
+      const byteLen = new TextEncoder().encode(restored).length;
+
+      document.getElementById('statChars').innerText = restored.length;
+      document.getElementById('statBytes').innerText = byteLen;
+      document.getElementById('statPackets').innerText = STATE.rxSession.totalPackets;
+      document.getElementById('statTime').innerText = `${elapsed}s`;
+
+      renderResultContent('TEXT');
+      document.getElementById('rxResultPanel').style.display = 'block';
+      showToast('🎉 データ復元・照合が完了しました！');
+    }
+
+    function switchResultTab(tab) {
+      document.getElementById('btnResultTabText').classList.toggle('active', tab === 'TEXT');
+      document.getElementById('btnResultTabHex').classList.toggle('active', tab === 'HEX');
+      renderResultContent(tab);
+    }
+
+    function renderResultContent(tab) {
+      const container = document.getElementById('rxResultContent');
+      if (tab === 'TEXT') {
+        container.innerText = STATE.rxDecodedText;
+      } else {
+        const bytes = new TextEncoder().encode(STATE.rxDecodedText);
+        let hex = '';
+        for (let i = 0; i < bytes.length; i++) {
+          hex += bytes[i].toString(16).toUpperCase().padStart(2, '0') + ' ';
+          if ((i + 1) % 16 === 0) hex += '\n';
+        }
+        container.innerText = hex.trim();
+      }
+    }
+
+    function shareRestoredData() {
+      if (!STATE.rxDecodedText) return;
+      if (navigator.share) {
+        navigator.share({
+          title: 'AERO-BEAM 受信データ',
+          text: STATE.rxDecodedText
+        }).catch(() => {
+          copyRestoredData();
+        });
+      } else {
+        copyRestoredData();
+      }
+    }
+
+    function copyRestoredData() {
+      if (!STATE.rxDecodedText) return;
+      navigator.clipboard.writeText(STATE.rxDecodedText).then(() => {
+        showToast('📋 クリップボードにコピーしました！');
+      }).catch(() => {
+        showToast('コピーに失敗しました');
+      });
+    }
+
+    function resetReceiver() {
+      STATE.rxSession = null;
+      STATE.rxDecodedText = '';
+      document.getElementById('rxResultPanel').style.display = 'none';
+      document.getElementById('packetMatrixGrid').innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); font-size: 0.75rem; padding: 20px 0; font-family: var(--font-mono);">カメラを送信画面にかざすとパケットを自動認識します</div>';
+      document.getElementById('matrixStatsText').innerText = '0 / 0 PACKETS';
+      document.getElementById('rxPacketProgressFill').style.width = '0%';
+      document.getElementById('rxPacketProgressText').innerText = '0%';
+      document.getElementById('rxVerifyProgressFill').style.width = '0%';
+      document.getElementById('rxVerifyProgressText').innerText = '0/3 (0%)';
+      document.getElementById('rxSessionTag').innerText = 'WAITING SIGNAL...';
+      showToast('🔄 レシーバーを初期化しました');
+    }
+
+    /* --------------------------------------------------------------------------
+       6. MODAL & GENERAL UTILITIES
+       -------------------------------------------------------------------------- */
+    function switchMode(mode) {
+      STATE.mode = mode;
+      document.getElementById('tabTransmit').classList.toggle('active', mode === 'TRANSMIT');
+      document.getElementById('tabReceive').classList.toggle('active', mode === 'RECEIVE');
+      document.getElementById('deckTransmit').style.display = mode === 'TRANSMIT' ? 'grid' : 'none';
+      document.getElementById('deckReceive').style.display = mode === 'RECEIVE' ? 'grid' : 'none';
+
+      if (mode === 'RECEIVE' && !STATE.rxIsScanning) {
+        startCamera();
+      }
+    }
+
+    document.getElementById('btnOpenMobileModal').addEventListener('click', openMobileModal);
+
+    function openMobileModal() {
+      const currentUrl = window.location.href;
+      document.getElementById('customUrlInput').value = currentUrl;
+      generateConnectQr(currentUrl);
+      document.getElementById('mobileConnectModal').classList.add('active');
+    }
+
+    function closeMobileModal() {
+      document.getElementById('mobileConnectModal').classList.remove('active');
+    }
+
+    function regenerateMobileQr() {
+      const customUrl = document.getElementById('customUrlInput').value.trim();
+      if (customUrl) {
+        generateConnectQr(customUrl);
+        showToast('接続QRを更新しました');
+      }
+    }
+
+    function generateConnectQr(url) {
+      const target = document.getElementById('mobileModalQrTarget');
+      target.innerHTML = '';
+      new QRCode(target, {
+        text: url,
+        width: 190,
+        height: 190,
+        colorDark: "#000000",
+        colorLight: "#FFFFFF",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    document.getElementById('btnToggleSound').addEventListener('click', () => {
+      STATE.soundEnabled = !STATE.soundEnabled;
+      document.getElementById('soundIcon').innerText = STATE.soundEnabled ? '🔊' : '🔇';
+      showToast(STATE.soundEnabled ? '🔊 サウンド: ON' : '🔇 サウンド: OFF');
+    });
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      toast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    // App Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      updateTxStats();
+      onFpsSliderChange(8);
+
+      const canvas = document.getElementById('txCanvas');
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0E1626';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('AERO-BEAM OPTICAL READY', canvas.width / 2, canvas.height / 2);
+    });
+  </script>
+</body>
+</html>
