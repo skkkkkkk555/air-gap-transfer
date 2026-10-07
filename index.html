@@ -172,7 +172,7 @@ function makePacketPages(packet,serial,seq,flags,granule){
  }
  return{pages:out,nextSeq:seq};
 }
-function validateComposition(u){
+async function validateComposition(u){
  const P=pages(u),ps=packets(u,P);if(P.length<3||ps.length<3)throw Error('OGGページ/音声パケット数が不足しています');
  const td=new TextDecoder(),head=td.decode(ps[0].data.subarray(0,8));if(head!=='OpusHead')throw Error('音声コーデックがOpusではありません');
  if(td.decode(ps[1].data.subarray(0,8))!=='OpusTags')throw Error('OpusTagsがありません');
