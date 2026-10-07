@@ -112,7 +112,8 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 <section><h2>1. 音源</h2>
 <input type="file" id="f" accept=".ogg,.mp3,.wav,.m4a,audio/*">
 <div id="info" class="sub" style="margin-top:8px"></div>
-<audio id="au" controls></audio></section>
+<audio id="au" controls preload="metadata" playsinline></audio>
+<button id="webPlay" style="display:none" type="button">▶ Web Audioで再生</button></section>
 
 
 <section><h2>2. 演出</h2>
@@ -188,8 +189,8 @@ function renderGIMap(){
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
 let currentAudioUrl=null,currentAudioMode='';
 const guessAudioMime=file=>{
-  if(file.type)return file.type;
   const n=(file.name||'').toLowerCase();
+  // Android file pickers can report generic/incorrect MIME types.
   if(n.endsWith('.mp3'))return 'audio/mpeg';
   if(n.endsWith('.wav'))return 'audio/wav';
   if(n.endsWith('.ogg'))return 'audio/ogg';
@@ -197,10 +198,44 @@ const guessAudioMime=file=>{
   if(n.endsWith('.m4a'))return 'audio/mp4';
   if(n.endsWith('.aac'))return 'audio/aac';
   if(n.endsWith('.flac'))return 'audio/flac';
-  return '';
+  const t=(file.type||'').toLowerCase();
+  return (t&&t!=='application/octet-stream'&&t!=='binary/octet-stream')?file.type:'';
 };
 const releaseAudioUrl=()=>{
   if(currentAudioUrl){try{URL.revokeObjectURL(currentAudioUrl)}catch(_){} currentAudioUrl=null}
+};
+let webPlayCtx=null,webPlayNode=null,webPlayStartedAt=0,webPlayOffset=0;
+const stopWebAudio=()=>{
+  try{if(webPlayNode)webPlayNode.stop()}catch(_){}
+  webPlayNode=null;
+  if($('#webPlay'))$('#webPlay').textContent='▶ Web Audioで再生';
+  webPlayOffset=0;
+};
+const playDecodedAudio=async()=>{
+  if(!S.buf)throw Error('解析済みの音声データがありません');
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw Error('Web Audio APIが利用できません');
+  if(!webPlayCtx)webPlayCtx=new AC();
+  if(webPlayCtx.state==='suspended')await webPlayCtx.resume();
+  if(webPlayNode){stopWebAudio();return}
+  const src=webPlayCtx.createBufferSource();
+  src.buffer=S.buf;
+  src.connect(webPlayCtx.destination);
+  const offset=Math.min(Math.max(0,webPlayOffset),Math.max(0,S.buf.duration-.001));
+  webPlayStartedAt=webPlayCtx.currentTime-offset;
+  webPlayNode=src;
+  src.onended=()=>{
+    if(webPlayNode===src){
+      webPlayNode=null;
+      webPlayOffset=0;
+      if($('#webPlay'))$('#webPlay').textContent='▶ Web Audioで再生';
+    }
+  };
+  src.start(0,offset);
+  if($('#webPlay'))$('#webPlay').textContent='⏹ Web Audioを停止';
+};
+$('#webPlay').onclick=()=>{
+  playDecodedAudio().catch(e=>say('Web Audio再生失敗: '+(e&&e.message||e),1));
 };
 const resetNativeAudio=au=>{
   au.pause();au.removeAttribute('src');
@@ -213,12 +248,16 @@ const setNativeFileSource=async(file)=>{
   releaseAudioUrl();
   resetNativeAudio(au);
   const mime=guessAudioMime(file);
-  const blob=mime&&file.type!==mime?new Blob([file],{type:mime}):file;
+  const blob=mime?new Blob([file],{type:mime}):file;
   currentAudioUrl=URL.createObjectURL(blob);
   currentAudioMode='blob';
   au.src=currentAudioUrl;
   au.load();
-  return {au,mime};
+  const nativeSupport=mime?au.canPlayType(mime):'';
+  const codecHints=['audio/mpeg','audio/wav','audio/mp4','audio/ogg','audio/ogg; codecs="opus"','audio/ogg; codecs="vorbis"']
+    .filter(x=>x!==mime&&au.canPlayType(x));
+  $('#info').textContent='音源検査: '+file.name+' / '+((mime)||file.type||'MIME不明')+' / canPlayType='+(nativeSupport||'no')+(codecHints.length?' / 候補='+codecHints.join(', '):'');
+  return {au,mime,nativeSupport};
 };
 const dataUrlFallback=async(file,au)=>{
   if(file.size>50*1024*1024)throw Error('Data URL fallback skipped: file is over 50 MB');
@@ -334,22 +373,49 @@ $('#f').onchange=async e=>{
  if(!au)throw Error('音声プレーヤーが見つかりません');
  au.onerror=null;
  au.onloadedmetadata=null;
+ au.oncanplay=null;
+ au.onloadeddata=null;
  const mime=guessAudioMime(f);
- au.onerror=async()=>{
+ let fallbackTimer=null;
+ const clearFallbackTimer=()=>{if(fallbackTimer){clearTimeout(fallbackTimer);fallbackTimer=null}};
+ const showNativeDiag=()=>{
    const er=au.error,code=er?er.code:0;
    const detail=code===1?'読み込みが中断':code===2?'データ取得エラー':code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':'不明なメディアエラー';
+   say('再生失敗：'+detail+' / MIME='+(mime||f.type||'不明')+' / code='+code+' / readyState='+au.readyState+' / networkState='+au.networkState+' / 経路='+currentAudioMode,1);
+ };
+ au.onerror=async()=>{
+   clearFallbackTimer();
    if(currentAudioMode==='blob'){
-     say('検証：blob:再生失敗 → Data URLへ自動切替 / '+detail+' / MIME='+(mime||'不明')+' / code='+code,1);
+     say('検証：blob再生失敗 → Data URLへ切替',1);
      try{await dataUrlFallback(f,au);return}catch(_){}
    }
-   say('再生失敗：'+detail+' / MIME='+(mime||'不明')+' / code='+code+' / 経路='+currentAudioMode,1);
+   showNativeDiag();
+   if($('#webPlay'))$('#webPlay').style.display=S.buf?'inline-block':'none';
  };
  au.onloadedmetadata=()=>{
+   clearFallbackTimer();
    if(au.duration&&Number.isFinite(au.duration)){
-     $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒 / 再生経路='+currentAudioMode;
+     $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒 / native='+currentAudioMode+' / '+Math.round(au.duration*10)/10+'秒';
    }
  };
+ au.oncanplay=()=>{clearFallbackTimer()};
+ au.onloadeddata=()=>{clearFallbackTimer()};
  await setNativeFileSource(f);
+ // Some Android builds hang on blob media without firing error. Do not wait forever.
+ fallbackTimer=setTimeout(async()=>{
+   if(currentAudioMode==='blob'&&au.readyState<1){
+     say('検証：blob再生が一定時間応答しない → Data URLへ切替',1);
+     try{
+       await dataUrlFallback(f,au);
+       setTimeout(()=>{
+         if(au.readyState<1&&$('#webPlay')&&S.buf)$('#webPlay').style.display='inline-block';
+       },2500);
+     }catch(e){
+       say('Data URL切替失敗: '+(e&&e.message||e),1);
+       if($('#webPlay'))$('#webPlay').style.display=S.buf?'inline-block':'none';
+     }
+   }
+ },3000);
 
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
@@ -377,6 +443,7 @@ $('#f').onchange=async e=>{
     if(ctx&&ctx.close)try{await ctx.close()}catch(_){}
   }
   if(!S.buf||!S.buf.length)throw Error('音声データをデコードできませんでした');
+  $('#webPlay').style.display='none';
   
   S.sourceOgg=reusableOgg;
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
