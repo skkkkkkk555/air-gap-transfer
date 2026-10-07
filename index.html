@@ -75,7 +75,7 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 @media(max-width:380px){.gi-panel{grid-template-columns:1fr}.gi-zones{grid-template-columns:repeat(9,1fr)}}
 </style></head><body>
 <h1>Glyphトーン工房</h1>
-<p class="sub">Phone (3a) の36ゾーン向け。音を解析して点灯データを作り、OGGに埋め込みます。</p>
+<p class="sub">Phone (3a)・36ゾーン専用。音の変化を解析して、瞬間演出と残光を組み合わせたGlyphパターンを生成します。</p>
 <section id="glyphInterface">
   <div class="gi-title">GLYPH INTERFACE</div>
   <div class="gi-panel">
@@ -104,7 +104,7 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
   <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
 </div>
 <div class="stage" style="margin-top:12px"><canvas id="cv" width="620" height="680"></canvas><div id="cnt"></div></div>
-<div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
+<div class="sub" style="text-align:center">外周＝音楽全体の動き / 中段＝周波数 / 内周＝キック・スネア・ハイハット / 中心＝総合パルス</div></section>
 
 <section><h2>3. 書き出し</h2>
 <label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.666"></label>
@@ -328,7 +328,7 @@ async function gen(){
    for(let i=1;i<n-1;i++){
      const a=Math.max(0,i-look),z=Math.min(n-1,i+look),mean=(prefix[z+1]-prefix[a])/Math.max(1,z-a+1);
      const v=src[i],peak=v>=src[i-1]&&v>=src[i+1];
-     const th=mean+baseStrength*(.12+.18*(1-rmsN[i]));
+     const th=mean+(baseStrength/Math.max(.55,SENS))*(.12+.18*(1-rmsN[i]));
      if(peak&&v>th&&v>.2&&i-last>=gap){
        let strength=(v-th)/(1-mean+1e-6);
        o[i]=Math.max(.18,Math.min(1,strength*1.35));
@@ -391,10 +391,10 @@ async function gen(){
      }
    }
    // 12 spectral zones: attack + hold + controlled decay.
-   for(let k=0;k<12;k++){
-     const q=bandN[k][t],attack=Math.max(0,q-trail[k]);
+   for(let k=0;k<11;k++){
+     const q=.62*bandN[k][t]+.38*bandN[k+1][t],attack=Math.max(0,q-trail[k]);
      trail[k]=Math.max(q,trail[k]*.90);
-     v[20+k]=Math.min(1,.12+q*.60+trail[k]*.25+attack*.95);
+     v[20+k]=Math.min(1,.10+q*.58+trail[k]*.24+attack*.90);
    }
    // 4 event zones + 1 master "pulse" zone.
    const pulse=Math.max(kick,sn,hat,m*.62);
@@ -476,12 +476,42 @@ $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 const cv=$('#cv'),cx=cv.getContext('2d'),CX=160,CY=150,R=133;
 const ARC=[[163,120,20],[14,-30,11],[229,211,5]],Z=[];
 ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
-function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTime/(+$('#dt').value/1000))):-1,rd=d=>-d*Math.PI/180;
- cx.setTransform(2,0,0,2,0,0);cx.clearRect(0,0,310,340);cx.shadowBlur=0;
- cx.beginPath();cx.roundRect(2,3,306,420,44);cx.fillStyle='#1a1a1a';cx.fill();
- cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
- cx.lineCap='round';cx.lineWidth=8;
- for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=`rgba(255,255,255,${.1+.9*v})`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
- cx.shadowBlur=0;$('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';requestAnimationFrame(draw)}
+function draw(){
+ const au=$('#au'),dt=+$('#dt').value||16.666;
+ const i=S.fr?Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(dt/1000)))):-1;
+ const t=au.currentTime||0;
+ const vals=i>=0?S.fr.subarray(i*N,i*N+N):null;
+ const pulse=vals?Math.max(...vals)/4095:0;
+ cx.setTransform(2,0,0,2,0,0);cx.clearRect(0,0,310,340);
+ const bg=cx.createLinearGradient(0,0,310,340);bg.addColorStop(0,'#202020');bg.addColorStop(.55,'#0c0c0c');bg.addColorStop(1,'#181818');
+ cx.fillStyle=bg;cx.beginPath();cx.roundRect(4,4,302,332,38);cx.fill();
+ cx.strokeStyle='rgba(255,255,255,.08)';cx.lineWidth=1;cx.stroke();
+ const glow=cx.createRadialGradient(155,158,12,155,158,145);
+ glow.addColorStop(0,'rgba(215,25,33,.12)');glow.addColorStop(.65,'rgba(215,25,33,.035)');glow.addColorStop(1,'rgba(215,25,33,0)');
+ cx.fillStyle=glow;cx.beginPath();cx.arc(155,158,145,0,Math.PI*2);cx.fill();
+ const drawZone=(k,r,w)=>{
+   const v=vals?vals[k]/4095:0,[p,q]=Z[k],a=Math.min(-p*Math.PI/180,-q*Math.PI/180),b=Math.max(-p*Math.PI/180,-q*Math.PI/180);
+   cx.beginPath();cx.arc(155,158,r,a,b);cx.lineWidth=w+v*3.2;cx.lineCap='round';
+   cx.shadowColor='rgba(255,65,75,.95)';cx.shadowBlur=v>0.05?7+22*v:0;
+   cx.strokeStyle=`rgba(255,255,255,${(.08+.92*v)*.82})`;cx.stroke();
+   if(v>.42){cx.beginPath();cx.arc(155,158,r,a,b);cx.lineWidth=1.8+v*2.6;cx.strokeStyle=`rgba(215,25,33,${.18+.72*v})`;cx.shadowBlur=12+25*v;cx.stroke()}
+ };
+ for(let k=0;k<20;k++)drawZone(k,128,5.6);
+ for(let k=20;k<31;k++)drawZone(k,101,5.2);
+ for(let k=31;k<36;k++)drawZone(k,77,k===35?6.4:5);
+ cx.shadowBlur=0;
+ cx.fillStyle='#070707';cx.beginPath();cx.arc(155,158,51,0,Math.PI*2);cx.fill();
+ cx.strokeStyle=`rgba(255,255,255,${.10+.24*pulse})`;cx.lineWidth=1;cx.beginPath();cx.arc(155,158,52+pulse*8,0,Math.PI*2);cx.stroke();
+ const g=cx.createRadialGradient(151,151,3,155,158,40);
+ g.addColorStop(0,`rgba(255,255,255,${.28+.32*pulse})`);g.addColorStop(.22,`rgba(215,25,33,${.20+.60*pulse})`);g.addColorStop(1,'rgba(215,25,33,0)');
+ cx.fillStyle=g;cx.beginPath();cx.arc(155,158,40,0,Math.PI*2);cx.fill();
+ cx.fillStyle='rgba(255,255,255,.9)';cx.font='800 12px Doto,monospace';cx.textAlign='center';cx.fillText('GLYPH 3a',155,154);
+ cx.fillStyle='rgba(255,255,255,.42)';cx.font='700 8px Doto,monospace';cx.fillText('36 ZONES',155,169);
+ const sweep=(t*.55)%310;cx.strokeStyle='rgba(215,25,33,.10)';cx.lineWidth=1;cx.beginPath();cx.moveTo(24+sweep*.84,303);cx.lineTo(286-sweep*.84,303);cx.stroke();
+ cx.fillStyle='rgba(255,255,255,.34)';cx.font='700 9px Zen Kaku Gothic New,system-ui';cx.textAlign='left';cx.fillText(i>=0?`FRAME ${String(i).padStart(5,'0')}`:'READY',24,322);
+ cx.textAlign='right';cx.fillText(i>=0?`${Math.round(au.currentTime*10)/10}s`:'',286,322);
+ $('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';
+ requestAnimationFrame(draw)
+}
 gi('待機中','音源を選択すると解析できます');draw();setInterval(updateGI,80);
 </script></body></html>
