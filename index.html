@@ -19,6 +19,8 @@
 })();
 </script>
 <title>Glyphトーン工房 3a</title>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#d71921;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -39,6 +41,15 @@ button.main{background:var(--acc);border-color:var(--acc);color:#fff}
 button:disabled{opacity:.4}
 button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 #st{font-size:13px;color:var(--mut);white-space:pre-wrap;margin-top:8px;min-height:20px}
+.progress-wrap{display:none;margin-top:12px}
+.progress-wrap.show{display:block}
+.progress-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mut);margin-bottom:6px}
+.progress-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden;position:relative}
+.progress-bar{height:100%;width:0%;background:var(--acc);border-radius:99px;transition:width .12s ease}
+.progress-bar.indeterminate{width:35%!important;animation:progressMove 1s ease-in-out infinite}
+@keyframes progressMove{0%{transform:translateX(-110%)}50%{transform:translateX(190%)}100%{transform:translateX(310%)}}
+.progress-pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);margin-right:5px;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
 #st.err{color:var(--acc)}
 audio{width:100%;margin-top:8px}
 .stage{display:flex;justify-content:center;position:relative}
@@ -54,6 +65,8 @@ canvas{width:300px;height:329px;max-width:100%}
 .gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0}
 .gi-zone.active{background:var(--acc);box-shadow:0 0 8px rgba(215,25,33,.45)}
+.gi-zone.scanning{animation:giScan .55s ease-in-out infinite alternate}
+@keyframes giScan{from{transform:scale(.72);opacity:.35}to{transform:scale(1.08);opacity:1}}
 .gi-foot{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin-top:7px}
 @media(max-width:380px){.gi-panel{grid-template-columns:1fr}.gi-zones{grid-template-columns:repeat(9,1fr)}}
 </style></head><body>
@@ -82,6 +95,10 @@ canvas{width:300px;height:329px;max-width:100%}
 <label>音の検知感度(右ほど細かい音も拾う) <span id="v4">1.0</span><input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"></label>
 <label>タイミング補正(ミリ秒、+で光を早める) <span id="v5">0</span><input type="range" id="lat" min="-150" max="150" step="5" value="0"></label>
 <button class="main" id="go" disabled>点灯データを生成</button>
+<div id="progressWrap" class="progress-wrap">
+  <div class="progress-top"><span><i class="progress-pulse"></i><span id="progressText">準備中…</span></span><b id="progressPct">0%</b></div>
+  <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+</div>
 <div class="stage" style="margin-top:12px"><canvas id="cv" width="620" height="680"></canvas><div id="cnt"></div></div>
 <div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
 
@@ -94,7 +111,13 @@ canvas{width:300px;height:329px;max-width:100%}
 
 <script>
 const $=s=>document.querySelector(s),N=36;
-const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null};
+const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null,converted:false};
+const progress=(pct,text,ind=false)=>{
+  const w=$('#progressWrap'),b=$('#progressBar');
+  w.classList.add('show');$('#progressText').textContent=text;$('#progressPct').textContent=ind?'':Math.round(pct)+'%';
+  b.classList.toggle('indeterminate',ind);if(!ind)b.style.width=Math.max(0,Math.min(100,pct))+'%';
+};
+const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),900)};
 const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択'};
 const updateGI=()=>{const z=document.querySelectorAll('.gi-zone');const au=$('#au');if(!S.fr||!S.F){z.forEach(x=>x.classList.remove('active'));return}const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(+$('#dt').value/1000))));for(let k=0;k<36;k++)z[k].classList.toggle('active',S.fr[i*36+k]>800);};
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
@@ -102,6 +125,35 @@ const cat=a=>{let n=0;a.forEach(x=>n+=x.length);const o=new Uint8Array(n);let p=
 const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)};
 const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
 const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
+
+/* ---- 音源→Vorbis OGG変換 ---- */
+let ffmpegInstance=null,ffmpegLoaded=false;
+async function ensureFFmpeg(){
+  if(ffmpegLoaded)return ffmpegInstance;
+  if(!window.FFmpeg||!window.FFmpeg.FFmpeg||!window.FFmpegUtil)throw Error('OGG変換エンジンを読み込めません');
+  ffmpegInstance=new window.FFmpeg.FFmpeg();
+  const {toBlobURL}=window.FFmpegUtil;
+  progress(0,'OGG変換エンジンを準備中…',true);
+  await ffmpegInstance.load({
+    coreURL:await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js','text/javascript'),
+    wasmURL:await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.wasm','application/wasm')
+  });
+  ffmpegLoaded=true;
+  return ffmpegInstance;
+}
+async function convertToOgg(file){
+  const ff=await ensureFFmpeg();
+  const {fetchFile}=window.FFmpegUtil;
+  const input='input_'+Date.now()+'.'+((file.name.split('.').pop()||'bin').toLowerCase());
+  const output='converted.ogg';
+  progress(0,'MP3をOGG(Vorbis)へ変換中…',true);
+  await ff.writeFile(input,await fetchFile(file));
+  await ff.exec(['-i',input,'-c:a','libvorbis','-q:a','5','-vn',output]);
+  const data=await ff.readFile(output);
+  try{await ff.deleteFile(input);await ff.deleteFile(output)}catch(_){}
+  progressDone('OGG変換完了');
+  return new Uint8Array(data);
+}
 
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
@@ -114,15 +166,46 @@ function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{for(let i=0;i<Ma
 function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<3)throw Error('OGGの構造を読めません');if(String.fromCharCode(...pk[0].subarray(1,7))!=='vorbis')throw Error('Vorbis形式のOGGのみ対応です(Opusは不可)');const{vendor,c}=parseC(pk[1]);const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1)=/i.test(s));const old1=c.find(s=>/^CUSTOM1=/i.test(s));const v1=$('#c1').value.trim();keep.push('AUTHOR='+author);if(v1)keep.push('CUSTOM1='+v1);else if(old1)keep.push(old1);const serial=u.subarray(P[0].o+14,P[0].o+18);const np=paginate([buildC(vendor,keep),pk[2]],serial,1);const parts=[u.subarray(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end);new DataView(pg.buffer).setUint32(18,seq++,true);new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
 
 /* ---- 読み込み ---- */
-$('#f').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.name=f.name.replace(/\.[^.]+$/,'');gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
- try{const ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=String.fromCharCode(...S.u8.subarray(0,4))==='OggS';
- S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);S.fr=null;S.tpl=null;
- let msg=`${S.buf.duration.toFixed(1)}秒 / ${S.ogg?'OGG':'OGG以外(プレビューとCSVのみ可)'}`;
- if(S.ogg){try{const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);const a=c.find(s=>/^AUTHOR=/i.test(s));if(a){const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
-$('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);msg+=`\n既存の点灯データを検出: ${rows.length}行×${cols}列 → 1行=${$('#dt').value}ミリ秒に合わせました`+(cols!==N?`\n列数が${N}ではありません。3a以外の可能性があります`:'')}
-  const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)'}catch(_){}}
- gi('準備完了','「点灯データを生成」を押してください。',f.name);$('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;say('「点灯データを生成」を押してください')}catch(x){say('読み込めません: '+x.message,1)}};
-['gain','dec','spd','sens','lat'].forEach((id,i)=>$('#'+id).oninput=e=>$('#v'+(i+1)).textContent=(+e.target.value).toFixed(id=='dec'?2:id=='lat'?0:1));
+$('#f').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
+ try{
+  const original=await f.arrayBuffer();
+  const originalU8=new Uint8Array(original);
+  const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
+  let ab=original,displayFile=f;
+  if(!isOgg){
+    progress(0,'OGG(Vorbis)へ自動変換中…',true);
+    const ogg=await convertToOgg(f);
+    S.u8=ogg;S.ogg=true;S.converted=true;
+    ab=ogg.buffer.slice(ogg.byteOffset,ogg.byteOffset+ogg.byteLength);
+    displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
+  }else{
+    S.u8=originalU8;S.ogg=true;
+  }
+  S.buf=await new AudioContext().decodeAudioData(ab.slice(0));
+  $('#au').src=URL.createObjectURL(displayFile);S.fr=null;S.tpl=null;
+  let msg=`${S.buf.duration.toFixed(1)}秒 / OGG(Vorbis)`;
+  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
+  try{
+   const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
+   const a=c.find(s=>/^AUTHOR=/i.test(s));
+   if(a){
+    const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
+    const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;
+    S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+    $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
+    msg+=`\\n既存の点灯データを検出: ${rows.length}行×${cols}列 → 1行=${$('#dt').value}ミリ秒に合わせました`+(cols!==N?`\\n列数が${N}ではありません。3a以外の可能性があります`:'');
+   }
+   const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+  }catch(_){}
+  gi('準備完了','「点灯データを生成」を押してください。',f.name);
+  $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
+  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
+  $('#progressWrap').classList.remove('show');
+ }catch(x){$('#progressWrap').classList.remove('show');say('読み込めません: '+x.message,1);gi('エラー','音源を読み込めませんでした。',f.name)}
+};
 
 /* ---- 解析・演出 ---- */
 function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
@@ -139,7 +222,7 @@ async function gen(){
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%300==0){say(`解析中 ${Math.round(t/F*100)}%`);await new Promise(r=>setTimeout(r))}}
+  if(t%120==0){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
@@ -161,8 +244,12 @@ async function gen(){
   for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
   const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
-$('#go').onclick=()=>{$('#go').disabled=true;gen().catch(e=>say('生成に失敗: '+e.message,1)).finally(()=>$('#go').disabled=false)};
+ S.fr=fr;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false;progressDone('解析完了')}
+$('#go').onclick=()=>{
+  $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);
+  progress(0,'解析を準備中…');
+  gen().catch(e=>{progressDone('解析失敗');say('生成に失敗: '+e.message,1);gi('エラー','解析に失敗しました。',S.name)}).finally(()=>$('#go').disabled=false)
+};
 
 /* ---- 書き出し ---- */
 function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
