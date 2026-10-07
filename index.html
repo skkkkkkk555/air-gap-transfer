@@ -174,15 +174,141 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 
 <script>
 const $=s=>document.querySelector(s),N=36;
-const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null,converted:false,sourceOgg:false};
+const S={buf:null,u8:null,ogg:false,fr:null,autoFr:null,manualFr:null,F:0,tpl:null,name:'glyph',tags:null,vendor:null,converted:false,sourceOgg:false,manualEvents:[],manualDown:false,manualLastZone:-1};
 const progress=(pct,text,ind=false)=>{
   const w=$('#progressWrap'),b=$('#progressBar');
   w.classList.add('show');$('#progressText').textContent=text;$('#progressPct').textContent=ind?'':Math.round(pct)+'%';
   b.classList.toggle('indeterminate',ind);if(!ind)b.style.width=Math.max(0,Math.min(100,pct))+'%';
 };
 const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),1600)};
-const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択';const scanning=/(中…|中)$/.test(status);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.toggle('scanning',scanning))};
-const updateGI=()=>{const z=document.querySelectorAll('.gi-zone');const au=$('#au');if(!S.fr||!S.F){z.forEach(x=>{x.classList.remove('active');x.style.opacity='';x.style.transform='';x.style.boxShadow='' });return}const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(+$('#dt').value/1000))));for(let k=0;k<36;k++){const v=S.fr[i*36+k]/4095;z[k].classList.toggle('active',v>.08);z[k].style.opacity=String(.18+.82*v);z[k].style.transform=`scale(${.82+.28*v})`;z[k].style.boxShadow=v>.05?`0 0 ${(3+13*v).toFixed(1)}px rgba(215,25,33,${(.15+.58*v).toFixed(2)})`:'none'}};
+
+const GI_GEOM={
+  C:{from:160,to:220,n:20,cx:180,cy:174,r:128},
+  A:{from:-12,to:30,n:11,cx:180,cy:174,r:128},
+  B:{x1:82,y1:246,x2:114,y2:210}
+};
+const GI_RING=Array.from({length:11},(_,i)=>20+i).concat(Array.from({length:5},(_,i)=>31+i),Array.from({length:20},(_,i)=>i));
+const GI_RING_POS=new Uint8Array(36);GI_RING.forEach((z,p)=>GI_RING_POS[z]=p);
+const PATTERN_NAMES=['ORBIT SHOCK','SPECTRUM BLOOM','FRACTAL CHASE'];
+const giSvg=$('#giSvg'),giZoneLayer=$('#giZoneLayer');
+const pointOnArc=(cx,cy,r,deg)=>{const q=deg*Math.PI/180;return[cx+r*Math.cos(q),cy+r*Math.sin(q)]};
+const svgEl=(tag,attrs)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const k in attrs)e.setAttribute(k,String(attrs[k]));return e};
+function renderGIMap(){
+  giZoneLayer.innerHTML='';
+  const add=(k,d,label)=>{
+    const g=svgEl('g',{class:'gi-zone','data-zone':k});
+    const hit=svgEl('path',{class:'gi-hit',d});
+    const light=svgEl('path',{class:'gi-light',d});
+    const title=svgEl('title',{});
+    title.textContent=label;
+    g.append(hit,light,title);giZoneLayer.appendChild(g);
+  };
+  for(let k=0;k<20;k++){
+    const a=GI_GEOM.C.from+(GI_GEOM.C.to-GI_GEOM.C.from)*k/20,b=GI_GEOM.C.from+(GI_GEOM.C.to-GI_GEOM.C.from)*(k+1)/20;
+    const p=pointOnArc(GI_GEOM.C.cx,GI_GEOM.C.cy,GI_GEOM.C.r,a),q=pointOnArc(GI_GEOM.C.cx,GI_GEOM.C.cy,GI_GEOM.C.r,b);
+    add(k,'M '+p[0].toFixed(2)+' '+p[1].toFixed(2)+' A '+GI_GEOM.C.r+' '+GI_GEOM.C.r+' 0 0 1 '+q[0].toFixed(2)+' '+q[1].toFixed(2),'C'+(k+1));
+  }
+  for(let k=0;k<11;k++){
+    const a=GI_GEOM.A.from+(GI_GEOM.A.to-GI_GEOM.A.from)*k/11,b=GI_GEOM.A.from+(GI_GEOM.A.to-GI_GEOM.A.from)*(k+1)/11;
+    const p=pointOnArc(GI_GEOM.A.cx,GI_GEOM.A.cy,GI_GEOM.A.r,a),q=pointOnArc(GI_GEOM.A.cx,GI_GEOM.A.cy,GI_GEOM.A.r,b);
+    add(20+k,'M '+p[0].toFixed(2)+' '+p[1].toFixed(2)+' A '+GI_GEOM.A.r+' '+GI_GEOM.A.r+' 0 0 1 '+q[0].toFixed(2)+' '+q[1].toFixed(2),'A'+(k+1));
+  }
+  for(let k=0;k<5;k++){
+    const f=k/5,g=(k+1)/5;
+    const x1=GI_GEOM.B.x1+(GI_GEOM.B.x2-GI_GEOM.B.x1)*f,y1=GI_GEOM.B.y1+(GI_GEOM.B.y2-GI_GEOM.B.y1)*f;
+    const x2=GI_GEOM.B.x1+(GI_GEOM.B.x2-GI_GEOM.B.x1)*g,y2=GI_GEOM.B.y1+(GI_GEOM.B.y2-GI_GEOM.B.y1)*g;
+    add(31+k,'M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2),'B'+(k+1));
+  }
+}
+const formatTime=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+(s%60).toFixed(1).padStart(4,'0');
+const clamp01=v=>Math.max(0,Math.min(1,v));
+const modeValue=()=>$('#editMode').value;
+function setManualUI(){
+  const manual=modeValue()==='manual';
+  $('#manualPanel').hidden=!manual;$('#manualTransport').hidden=!manual;$('#manualActions').hidden=!manual;$('#go').style.display=manual?'none':'';
+  if(manual){
+    S.fr=S.manualFr||null;$('#ex').disabled=!S.fr;$('#csv').disabled=!S.fr;
+    gi('手動編集中','音源を再生しながらGlyphをタップ / スライドしてください。',S.name);
+  }else{
+    S.fr=S.autoFr||null;$('#ex').disabled=!S.fr;$('#csv').disabled=!S.fr;
+    gi(S.fr?'解析完了':'準備完了',S.fr?'自動パターンを再生できます。':'「3パターンを自動解析して生成」を押してください。',S.name);
+  }
+}
+const gi=(status,hint,input)=>{
+  $('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択';
+  const scanning=/(中…|中)$/.test(status);
+  document.querySelectorAll('.gi-zone').forEach(x=>x.classList.toggle('scanning',scanning));
+};
+const updateGI=()=>{
+  const z=document.querySelectorAll('.gi-zone'),au=$('#au');
+  if(!S.fr||!S.F){
+    z.forEach(x=>{x.classList.remove('active');const l=x.querySelector('.gi-light');if(l){l.style.opacity='.16';l.style.strokeWidth='8';l.style.filter='none'}});
+    return;
+  }
+  const dt=(+$('#dt').value||16.666)/1000;
+  const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/dt)));
+  for(let k=0;k<36;k++){
+    const v=Math.max(0,Math.min(1,S.fr[i*36+k]/4095)),l=z[k].querySelector('.gi-light');
+    z[k].classList.toggle('active',v>.05);
+    if(l){l.style.opacity=String(.10+.90*v);l.style.strokeWidth=(5.5+6.5*v).toFixed(2);l.style.filter=v>.35?'drop-shadow(0 0 '+(3+16*v).toFixed(1)+'px rgba(255,255,255,.72))':'none'}
+  }
+  $('#manualClock').textContent=formatTime(au.currentTime);
+  if($('#manualSeek')&&S.buf)$('#manualSeek').value=String(Math.min(1,au.duration?au.currentTime/au.duration:0));
+};
+const addAt=(fr,t,k,amp,tailFrames,decay)=>{
+  if(k<0||k>=36)return;
+  const dt=(+$('#dt').value||16.666)/1000,base=Math.round(t/dt);
+  for(let q=0;q<=tailFrames;q++){
+    const j=base+q;if(j<0||j>=S.F)continue;
+    const v=amp*Math.pow(decay,q),idx=j*36+k;
+    fr[idx]=Math.min(4095,fr[idx]+Math.round(4095*v));
+  }
+};
+const zoneNeighbors=k=>{
+  const p=GI_RING_POS[k],out=[];for(const d of [-2,-1,1,2])out.push(GI_RING[(p+d+36)%36]);return out;
+};
+function rebuildManual(){
+  if(!S.buf)return;
+  const dt=(+$('#dt').value||16.666)/1000;
+  S.F=Math.max(1,Math.ceil(S.buf.duration/dt));
+  const out=new Uint16Array(S.F*36),tailFrames=Math.max(1,Math.round((+$('#manualTail').value||.36)/dt)),bright=+$('#manualBright').value||1;
+  for(let n=0;n<S.manualEvents.length;n++){
+    const ev=S.manualEvents[n],amp=clamp01(ev.a*bright),base=Math.round(ev.t/dt),fx=ev.fx||'tap';
+    if(fx==='tap'||fx==='flow'){
+      addAt(out,ev.t,ev.k,amp,tailFrames,.70);
+    }else if(fx==='echo'){
+      addAt(out,ev.t,ev.k,amp,tailFrames,.70);
+      for(let q=1;q<=4;q++){
+        const h=S.manualEvents[n-q];if(!h)continue;
+        addAt(out,ev.t,h.k,amp*(.46*Math.pow(.62,q-1)),Math.max(1,Math.round(tailFrames*.42)),.74);
+      }
+    }else if(fx==='ripple'){
+      addAt(out,ev.t,ev.k,amp,Math.max(1,Math.round(tailFrames*.55)),.58);
+      zoneNeighbors(ev.k).forEach((k,j)=>addAt(out,ev.t+dt*(j+1)*1.6,k,amp*(.60-.08*j),Math.max(1,Math.round(tailFrames*.35)),.66));
+    }else if(fx==='orbit'){
+      const p=GI_RING_POS[ev.k];
+      for(let q=0;q<14;q++)addAt(out,ev.t+q*dt*2.0,GI_RING[(p+q)%36],amp*Math.pow(.94,q),Math.max(1,Math.round(tailFrames*.28)),.72);
+    }else if(fx==='mirror'){
+      const p=GI_RING_POS[ev.k],mirror=GI_RING[(36-p)%36];
+      addAt(out,ev.t,ev.k,amp,tailFrames,.70);addAt(out,ev.t,mirror,amp*.82,tailFrames,.70);
+      zoneNeighbors(ev.k).slice(0,2).forEach((k,j)=>addAt(out,ev.t+dt*(j+1),k,amp*(.42-.10*j),Math.max(1,Math.round(tailFrames*.3)),.72));
+    }else if(fx==='spark'){
+      addAt(out,ev.t,ev.k,amp,Math.max(1,Math.round(tailFrames*.35)),.50);
+      const p=GI_RING_POS[ev.k];
+      for(let q=0;q<5;q++){const k=GI_RING[(p+((q&1)?q+2:-(q+1))+36)%36];addAt(out,ev.t+q*dt,k,amp*(.75-.12*q),2,.45)}
+    }
+  }
+  S.manualFr=out;S.F=out.length/36;
+  if(modeValue()==='manual'){S.fr=out;$('#ex').disabled=false;$('#csv').disabled=false}
+  $('#manualCount').textContent=S.manualEvents.length+' EVENTS';
+}
+const findZone=e=>{const g=e.target&&e.target.closest?e.target.closest('.gi-zone'):null;return g?Number(g.getAttribute('data-zone')):-1};
+const manualTap=(k,t)=>{
+  if(modeValue()!=='manual'||k<0)return;
+  if(S.manualEvents.length>1500)S.manualEvents.splice(0,300);
+  S.manualEvents.push({k:k,t:t,fx:$('#manualFx').value,a:+$('#manualBright').value||1});
+  rebuildManual();
+};
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
 window.addEventListener('error',e=>{
  const m=e&&e.error&&e.error.message||e&&e.message||'不明なJavaScriptエラー';
