@@ -25,9 +25,11 @@ if(location.search.includes('swclean=1')){
 })();
 </script>
 
-<!-- Nothing Glyph Composer compatible Ogg/Opus encoder -->
-<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/OpusMediaRecorder.umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/encoderWorker.umd.js"></script>
+<!-- Direct Ogg Opus WASM encoder -->
+<script type="module">
+import opus from "https://cdn.jsdelivr.net/npm/@audio/encode-opus@1.3.1/opus-encode.js";
+window.__glyphOpusReady=Promise.resolve(opus);
+</script>
 
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -136,21 +138,22 @@ const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new Decom
 
 /* ---- 音源→Composer互換Ogg Opus変換（ブラウザ内完結） ---- */
 async function convertBufferToOgg(audioBuffer){
- if(!window.OpusMediaRecorder)throw Error('Ogg/Opus変換エンジンを読み込めません');
- const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('Web Audio APIが必要です');
- const targetRate=48000,channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
- const ctx=new AC({sampleRate:targetRate}),frames=Math.ceil(audioBuffer.duration*targetRate),buf=ctx.createBuffer(channels,frames,targetRate);
- for(let ch=0;ch<channels;ch++){const out=buf.getChannelData(ch),src=audioBuffer.getChannelData(Math.min(ch,audioBuffer.numberOfChannels-1)),scale=(src.length-1)/Math.max(1,frames-1);for(let i=0;i<frames;i++){const p=i*scale,a=Math.floor(p),f=p-a;out[i]=(src[a]||0)*(1-f)+(src[Math.min(a+1,src.length-1)]||0)*f}}
- const dest=ctx.createMediaStreamDestination(),node=ctx.createBufferSource();node.buffer=buf;node.connect(dest);
- const workerOptions={OggOpusEncoderWasmPath:'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/OggOpusEncoder.wasm'};
- progress(2,'Composer互換のOgg Opusへ変換中…');
- const rec=new OpusMediaRecorder(dest.stream,{mimeType:'audio/ogg'},workerOptions),chunks=[];
- return await new Promise((resolve,reject)=>{
-  let done=false;const fail=x=>{if(done)return;done=true;try{ctx.close()}catch(_){}reject(x instanceof Error?x:Error(String(x)))};
-  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};rec.onerror=fail;
-  rec.onstop=async()=>{if(done)return;done=true;try{const blob=new Blob(chunks,{type:'audio/ogg'});if(blob.size<64)throw Error('Ogg Opus変換結果が空です');const out=new Uint8Array(await blob.arrayBuffer());try{await ctx.close()}catch(_){}resolve(out)}catch(x){fail(x)}};
-  try{rec.start();node.onended=()=>rec.stop();node.start()}catch(x){fail(x)}
- });
+ const ready=window.__glyphOpusReady;
+ if(!ready)throw Error('Ogg/Opus高速変換エンジンを読み込めません');
+ const opus=await ready;
+ if(typeof opus!=='function')throw Error('Ogg/Opus高速変換エンジンが初期化されていません');
+ const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
+ progress(0,'Composer互換Ogg Opusへ高速変換中…',true);
+ gi('OGG変換中…','WASM/libopusでComposer互換のOgg Opusを生成しています。',S.name);
+ say('Composer互換Ogg Opusへ高速変換中…');
+ await new Promise(r=>setTimeout(r,0));
+ try{
+   const data=channels===1?audioBuffer.getChannelData(0):Array.from({length:channels},(_,ch)=>audioBuffer.getChannelData(ch));
+   const out=await opus({sampleRate:audioBuffer.sampleRate,channels,bitrate:96,application:'audio',complexity:2})(data);
+   if(!(out instanceof Uint8Array)||out.length<64)throw Error('Ogg Opus変換結果が空です');
+   progressDone('Ogg Opus変換完了');
+   return out;
+ }catch(x){throw Error('Ogg Opus変換に失敗しました: '+(x&&x.message||x))}
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
@@ -216,7 +219,7 @@ $('#f').onchange=async e=>{
   $('#au').src=URL.createObjectURL(f);
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
-  if(isOgg)try{
+  if(reusableOgg)try{
    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
    const a=c.find(s=>/^AUTHOR=/i.test(s));
    if(a){
@@ -335,7 +338,7 @@ $('#ex').onclick=async()=>{
   if(!S.ogg){
    gi('OGG変換中…','Composer互換のOgg Opusを作成しています。',S.name);
    say('Composer互換のOgg Opusへ変換中…');
-   progress(0,'Composer互換Ogg Opusへ変換中…');
+   progress(0,'Composer互換Ogg Opusへ高速変換中…',true);
    S.u8=await convertBufferToOgg(S.buf);
    S.ogg=true;S.converted=true;
   }
