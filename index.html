@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-version" content="41d7361-cleanup1">
+<meta name="app-version" content="1da0b064-vorbis1">
 <script>
 /* Clean up stale service workers left by older versions of this app. */
 (async()=>{
@@ -10,13 +10,19 @@
     const base=new URL('./',location.href).href;
     const regs=await navigator.serviceWorker.getRegistrations();
     const stale=regs.filter(r=>r.scope.startsWith(base));
-    if(stale.length && !sessionStorage.getItem('glyph-sw-cleaned')){
-      sessionStorage.setItem('glyph-sw-cleaned','1');
+    if(stale.length){
       await Promise.all(stale.map(r=>r.unregister()));
-      location.reload();
+      const u=new URL(location.href);
+      if(!u.searchParams.has('swclean')){u.searchParams.set('swclean','1');location.replace(u.href)}
     }
   }catch(_){}
 })();
+</script>
+<script>
+/* Force the browser to abandon obsolete FFmpeg-era cached documents. */
+if(location.search.includes('swclean=1')){
+  try{history.replaceState(null,'',location.pathname+'?v=1da0b064')}catch(_){}
+}
 </script>
 <title>Glyphトーン工房 3a</title>
 
