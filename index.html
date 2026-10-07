@@ -122,7 +122,7 @@ const progress=(pct,text,ind=false)=>{
   b.classList.toggle('indeterminate',ind);if(!ind)b.style.width=Math.max(0,Math.min(100,pct))+'%';
 };
 const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),1600)};
-const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択';document.querySelectorAll('.gi-zone').forEach(x=>x.classList.toggle('scanning',status.includes('解析')||status.includes('変換')||status.includes('読み込み')))};
+const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択';const scanning=/(中…|中)$/.test(status);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.toggle('scanning',scanning))};
 const updateGI=()=>{const z=document.querySelectorAll('.gi-zone');const au=$('#au');if(!S.fr||!S.F){z.forEach(x=>x.classList.remove('active'));return}const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(+$('#dt').value/1000))));for(let k=0;k<36;k++)z[k].classList.toggle('active',S.fr[i*36+k]>800);};
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
 window.addEventListener('error',e=>{
