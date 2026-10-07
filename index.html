@@ -2,22 +2,7 @@
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="app-version" content="1da0b064-vorbis1">
-<script>
-/* Clean up stale service workers left by older versions of this app. */
-(async()=>{
-  try{
-    if(!('serviceWorker' in navigator)) return;
-    const base=new URL('./',location.href).href;
-    const regs=await navigator.serviceWorker.getRegistrations();
-    const stale=regs.filter(r=>r.scope.startsWith(base));
-    if(stale.length){
-      await Promise.all(stale.map(r=>r.unregister()));
-      const u=new URL(location.href);
-      if(!u.searchParams.has('swclean')){u.searchParams.set('swclean','1');location.replace(u.href)}
-    }
-  }catch(_){}
-})();
-</script>
+
 <script>
 /* Force the browser to abandon obsolete FFmpeg-era cached documents. */
 if(location.search.includes('swclean=1')){
@@ -25,6 +10,11 @@ if(location.search.includes('swclean=1')){
 }
 </script>
 <title>Glyphトーン工房 3a</title>
+<script>
+/* Local-page-safe Vorbis encoder. No ffmpeg, no worker, no dynamic module import. */
+var OggVorbisEncoderConfig={memoryInitializerPrefixURL:'https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/'};
+</script>
+<script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.min.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -131,32 +121,31 @@ const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.app
 const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
 const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
 
-/* ---- 音源→Vorbis OGG変換（FFmpeg不要） ---- */
-let oggEncoderModule=null;
-async function ensureOggEncoder(){
-  if(oggEncoderModule)return oggEncoderModule;
-  progress(2,'OGG変換エンジンを読み込み中…',true);
-  const mod=await import('https://esm.sh/@audio/encode-ogg@1.2.2?bundle');
-  oggEncoderModule=mod.default||mod.ogg||mod;
-  if(typeof oggEncoderModule!=='function')throw Error('OGG変換エンジンの初期化に失敗しました');
-  return oggEncoderModule;
+/* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
+function ensureOggEncoder(){
+  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG変換エンジンを読み込めません');
+  return window.OggVorbisEncoder;
 }
 async function convertBufferToOgg(audioBuffer){
-  const ogg=await ensureOggEncoder();
+  const Encoder=ensureOggEncoder();
   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
   const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
-  const encoder=await ogg({sampleRate,channels,quality:5}),parts=[];
+  progress(4,'OGG(Vorbis)変換を開始…');
+  await new Promise(r=>setTimeout(r,0));
+  const encoder=new Encoder(sampleRate,channels,.5);
   const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
   for(let pos=0;pos<total;pos+=chunkSize){
-    const end=Math.min(total,pos+chunkSize),data=[];
-    for(let c=0;c<channels;c++)data.push(audioBuffer.getChannelData(c).subarray(pos,end));
-    const part=encoder.encode(data);if(part&&part.length)parts.push(part);
-    progress(5+end/Math.max(1,total)*90,'MP3をOGG(Vorbis)へ変換中…');
+    const end=Math.min(total,pos+chunkSize);
+    const data=[];
+    for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
+    encoder.encode(data);
+    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
     await new Promise(r=>setTimeout(r,0));
   }
-  const tail=encoder.flush();if(tail&&tail.length)parts.push(tail);
+  const blob=encoder.finish('audio/ogg');
+  if(!blob||blob.size<64)throw Error('OGG変換結果が空です');
   progressDone('OGG変換完了');
-  return cat(parts);
+  return new Uint8Array(await blob.arrayBuffer());
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
@@ -233,7 +222,7 @@ async function gen(){
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%16==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
+  if(t%8==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
