@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-version" content="1da0b064-vorbis1">
+<meta name="app-version" content="1da0b064-vorbis2-wasm">
 
 <script>
 /* Force the browser to abandon obsolete cached documents. */
@@ -25,11 +25,8 @@ if(location.search.includes('swclean=1')){
 })();
 </script>
 
-<script>
-/* Browser-local Vorbis encoder. */
-var OggVorbisEncoderConfig={memoryInitializerPrefixURL:'https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/'};
-</script>
-<script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.min.js"></script>
+<!-- Lightweight WebAssembly Ogg/Vorbis encoder -->
+<script src="https://unpkg.com/wasm-media-encoders/dist/umd/WasmMediaEncoder.min.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -137,30 +134,35 @@ const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().
 const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
 
 /* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
-function ensureOggEncoder(){
-  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG変換エンジンを読み込めません');
-  return window.OggVorbisEncoder;
+let _oggEncoderPromise=null;
+async function ensureOggEncoder(){
+  if(!window.WasmMediaEncoder||typeof WasmMediaEncoder.createOggEncoder!=='function')
+    throw Error('高速OGG変換エンジンを読み込めません');
+  if(!_oggEncoderPromise)_oggEncoderPromise=WasmMediaEncoder.createOggEncoder();
+  return await _oggEncoderPromise;
 }
 async function convertBufferToOgg(audioBuffer){
-  const Encoder=ensureOggEncoder();
+  const encoder=await ensureOggEncoder();
   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
   const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
-  progress(4,'OGG(Vorbis)変換を開始…');
+  encoder.configure({sampleRate,channels,vbrQuality:1});
+  progress(2,'OGG(Vorbis)高速変換を開始…');
   await new Promise(r=>setTimeout(r,0));
-  const encoder=new Encoder(sampleRate,channels,.2);
-  const chunkSize=Math.max(16384,Math.floor(sampleRate*1.0));
+  const chunks=[],chunkSize=Math.max(32768,Math.floor(sampleRate*2));
   for(let pos=0;pos<total;pos+=chunkSize){
-    const end=Math.min(total,pos+chunkSize);
-    const data=[];
+    const end=Math.min(total,pos+chunkSize),data=[];
     for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
-    encoder.encode(data);
-    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
+    const part=encoder.encode(data);
+    if(part&&part.length)chunks.push(new Uint8Array(part));
+    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)高速変換中…');
     await new Promise(r=>setTimeout(r,0));
   }
-  const blob=encoder.finish('audio/ogg');
-  if(!blob||blob.size<64)throw Error('OGG変換結果が空です');
-  progressDone('OGG変換完了');
-  return new Uint8Array(await blob.arrayBuffer());
+  const tail=encoder.finalize();
+  if(tail&&tail.length)chunks.push(new Uint8Array(tail));
+  const out=cat(chunks);
+  if(out.length<64)throw Error('OGG変換結果が空です');
+  progressDone('高速OGG変換完了');
+  return out;
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
