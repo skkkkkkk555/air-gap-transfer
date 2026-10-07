@@ -178,7 +178,7 @@ function validateComposition(u){
  const rows=author.split(/\r\n|\n/).filter(x=>x.length);if(!rows.length)throw Error('AUTHORデータが空です');
  for(const row of rows){const v=row.split(',').filter(x=>x!=='');if(v.length!==36)throw Error('AUTHORの列数が36ではありません');for(const x of v){const n=Number(x);if(!Number.isInteger(n)||n<0||n>4095)throw Error('AUTHOR値が0〜4095の範囲外です')}}
  const custom=await inflate(Uint8Array.from(atob(map.get('CUSTOM1').replace(/\s/g,'')),x=>x.charCodeAt(0)));if(custom!==','&&!/^(?:\d+-\d+,)*$/.test(custom))throw Error('CUSTOM1形式が不正です');
- for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength);d.setUint32(22,0,true);if(d.getUint32(22,true)!==crc(q))throw Error('OGG CRC検証失敗')}
+ for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength),expected=d.getUint32(22,true);d.setUint32(22,0,true);if(expected!==crc(q))throw Error('OGG CRC検証失敗')}
  return{pages:P.length,rows:rows.length,durationPackets:ps.length};
 }
 function rewrite(u,meta){
