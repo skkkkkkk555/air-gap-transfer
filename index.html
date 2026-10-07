@@ -134,9 +134,8 @@ const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.app
 const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
 const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
 
-/* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
-let _oggEncoderPromise=null;
-async async function convertBufferToOgg(audioBuffer){
+/* ---- 音源→Composer互換Ogg Opus変換（ブラウザ内完結） ---- */
+async function convertBufferToOgg(audioBuffer){
  if(!window.OpusMediaRecorder)throw Error('Ogg/Opus変換エンジンを読み込めません');
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('Web Audio APIが必要です');
  const targetRate=48000,channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
@@ -341,6 +340,7 @@ $('#ex').onclick=async()=>{
   progress(92,'点灯データを書き込み中…');
   const z=await deflate(csvText()),c1=await deflate(',');
   const out=rewrite(S.u8,{title:S.name,album:'Glyph Tools v2',author:b64(z),composer:'v1-Asteroids Glyph Composer',custom1:b64(c1),custom2:'36cols'});
+  await validateComposition(out);
   dl(out,S.name+'_glyph.ogg');
   gi('書き出し完了','公式Composerのライブラリから取り込んでください。',S.name);
   say('書き出しました。公式Composerのライブラリから取り込んでください');
