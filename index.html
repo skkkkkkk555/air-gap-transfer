@@ -438,7 +438,7 @@ S.sourceOgg=reusableOgg;
    }
       const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1){try{S.tpl=S.tpl||{};S.tpl.custom1=await inflate(Uint8Array.from(atob(o1.slice(8).replace(/\s/g,'')),ch=>ch.charCodeAt(0)))}catch(_){S.tpl=S.tpl||{};S.tpl.custom1=o1.slice(8)}msg+='\nCUSTOM1タグを検出(そのまま引き継ぎます)';}
   }catch(_){}
-  gi('準備完了','「点灯データを生成」を押してください。',f.name);
+  setManualUI();
   $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
   say('「点灯データを生成」を押してください');
   progressDone('音源の準備完了');
@@ -655,6 +655,64 @@ $('#go').onclick=async()=>{
   try{await gen()}catch(e){progressDone('解析失敗');say('生成に失敗: '+(e&&e.message||e),1);gi('エラー','解析に失敗しました。',S.name)}finally{$('#go').disabled=false}
 };
 
+
+renderGIMap();
+
+giSvg.addEventListener('pointerdown',e=>{
+  if(modeValue()!=='manual')return;
+  const g=e.target&&e.target.closest?e.target.closest('.gi-zone'):null;
+  if(!g)return;
+  const k=Number(g.getAttribute('data-zone'));
+  S.manualDown=true;S.manualLastZone=k;
+  try{giSvg.setPointerCapture(e.pointerId)}catch(_){}
+  manualTap(k,$('#au').currentTime);
+});
+giSvg.addEventListener('pointermove',e=>{
+  if(!S.manualDown||modeValue()!=='manual')return;
+  const g=e.target&&e.target.closest?e.target.closest('.gi-zone'):null;
+  if(!g)return;
+  const k=Number(g.getAttribute('data-zone'));
+  if(k===S.manualLastZone)return;
+  S.manualLastZone=k;manualTap(k,$('#au').currentTime);
+});
+const endManual=()=>{S.manualDown=false;S.manualLastZone=-1};
+giSvg.addEventListener('pointerup',endManual);
+giSvg.addEventListener('pointercancel',endManual);
+giSvg.addEventListener('pointerleave',()=>{if(S.manualDown){S.manualDown=false;S.manualLastZone=-1}});
+
+$('#editMode').onchange=setManualUI;
+$('#manualFx').onchange=()=>{if(modeValue()==='manual')rebuildManual()};
+$('#manualBright').oninput=()=>{
+  $('#mv1').textContent=(+$('#manualBright').value).toFixed(2);
+  if(modeValue()==='manual')rebuildManual();
+};
+$('#manualTail').oninput=()=>{
+  $('#mv2').textContent=(+$('#manualTail').value).toFixed(2);
+  if(modeValue()==='manual')rebuildManual();
+};
+$('#manualUndo').onclick=()=>{if(S.manualEvents.length){S.manualEvents.pop();rebuildManual()}};
+$('#manualClear').onclick=()=>{S.manualEvents=[];rebuildManual()};
+$('#manualPlay').onclick=async()=>{
+  const au=$('#au');
+  if(!au.src)return;
+  if(au.paused){try{await au.play()}catch(e){say('再生できません: '+(e.message||e),1)}}
+  else au.pause();
+};
+$('#manualSeek').oninput=e=>{
+  const au=$('#au');if(au.duration)au.currentTime=Number(e.target.value)*au.duration;
+};
+$('#au').addEventListener('play',()=>$('#manualPlay').textContent='❚❚ 一時停止');
+$('#au').addEventListener('pause',()=>$('#manualPlay').textContent='▶ 再生');
+$('#au').addEventListener('timeupdate',()=>{
+  const au=$('#au');if($('#manualClock'))$('#manualClock').textContent=formatTime(au.currentTime);
+  if($('#manualSeek')&&au.duration)$('#manualSeek').value=String(au.currentTime/au.duration);
+});
+$('#dt').addEventListener('input',()=>{
+  if(!S.buf)return;
+  if(modeValue()==='manual')rebuildManual();
+});
+setManualUI();
+
 /* ---- 書き出し ---- */
 function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
 const dl=(u,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u]));a.download=n;a.click()};
@@ -692,7 +750,7 @@ $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 
 /* ---- プレビュー ---- */
 const cv=$('#cv'),cx=cv.getContext('2d'),CX=160,CY=150,R=133;
-const ARC=[[163,120,20],[14,-30,11],[229,211,5]],Z=[];
+const ARC=[[160,220,20],[-12,30,11],[138,163,5]],Z=[];
 ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
 function draw(){
  const au=$('#au'),dt=+$('#dt').value||16.666;
@@ -705,10 +763,7 @@ function draw(){
  cx.strokeStyle='rgba(255,255,255,.10)';cx.lineWidth=1;cx.stroke();
  // Nothing 3a Glyph-like three separated arc groups, matching the 20/11/5 zone layout.
  const groups=[{from:0,to:20,r:128,w:7},{from:20,to:31,r:99,w:7},{from:31,to:36,r:69,w:6}];
- const palette=[
-   [232,232,232],[255,255,255],[210,210,210],[245,245,245]
- ];
- const drawZone=(k,r,w)=>{
+  const drawZone=(k,r,w)=>{
    const v=vals?vals[k]/4095:0,[p,q]=Z[k];
    const a=-p*Math.PI/180,b=-q*Math.PI/180;
    const lo=Math.min(a,b),hi=Math.max(a,b);
