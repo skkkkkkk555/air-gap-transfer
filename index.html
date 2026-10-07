@@ -147,13 +147,16 @@ async function convertBufferToOgg(audioBuffer){
  gi('OGG変換中…','WASM/libopusでComposer互換のOgg Opusを生成しています。',S.name);
  say('Composer互換Ogg Opusへ高速変換中…');
  await new Promise(r=>setTimeout(r,0));
+ let enc=null;
  try{
    const data=channels===1?audioBuffer.getChannelData(0):Array.from({length:channels},(_,ch)=>audioBuffer.getChannelData(ch));
-   const out=await opus({sampleRate:audioBuffer.sampleRate,channels,bitrate:96,application:'audio',complexity:2})(data);
+   enc=await opus({sampleRate:audioBuffer.sampleRate,channels,bitrate:96,application:'audio',complexity:2});
+   const a=enc.encode(data),b=enc.flush(),out=cat([a,b]);
+   enc.free();enc=null;
    if(!(out instanceof Uint8Array)||out.length<64)throw Error('Ogg Opus変換結果が空です');
    progressDone('Ogg Opus変換完了');
    return out;
- }catch(x){throw Error('Ogg Opus変換に失敗しました: '+(x&&x.message||x))}
+ }catch(x){try{if(enc)enc.free()}catch(_){};throw Error('Ogg Opus変換に失敗しました: '+(x&&x.message||x))}
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
