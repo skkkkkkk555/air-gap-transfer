@@ -113,7 +113,7 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 <input type="file" id="f" accept=".ogg,.mp3,.wav,.m4a,audio/*">
 <div id="info" class="sub" style="margin-top:8px"></div>
 <audio id="au" controls preload="metadata" playsinline></audio>
-<button id="webPlay" style="display:none" type="button">▶ Web Audioで再生</button></section>
+<button id="webPlay" style="display:none" type="button">▶ 互換再生（Web Audio）</button></section>
 
 
 <section><h2>2. 演出</h2>
@@ -208,7 +208,7 @@ let webPlayCtx=null,webPlayNode=null,webPlayStartedAt=0,webPlayOffset=0;
 const stopWebAudio=()=>{
   try{if(webPlayNode)webPlayNode.stop()}catch(_){}
   webPlayNode=null;
-  if($('#webPlay'))$('#webPlay').textContent='▶ Web Audioで再生';
+  if($('#webPlay'))$('#webPlay').textContent='▶ 互換再生（Web Audio）';
   webPlayOffset=0;
 };
 const playDecodedAudio=async()=>{
@@ -228,7 +228,7 @@ const playDecodedAudio=async()=>{
     if(webPlayNode===src){
       webPlayNode=null;
       webPlayOffset=0;
-      if($('#webPlay'))$('#webPlay').textContent='▶ Web Audioで再生';
+      if($('#webPlay'))$('#webPlay').textContent='▶ 互換再生（Web Audio）';
     }
   };
   src.start(0,offset);
@@ -443,7 +443,8 @@ $('#f').onchange=async e=>{
     if(ctx&&ctx.close)try{await ctx.close()}catch(_){}
   }
   if(!S.buf||!S.buf.length)throw Error('音声データをデコードできませんでした');
-  $('#webPlay').style.display='none';
+  $('#webPlay').style.display='inline-block';
+  $('#webPlay').textContent='▶ 互換再生（Web Audio）';
   
   S.sourceOgg=reusableOgg;
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
@@ -737,7 +738,8 @@ GLYPH_REF.arc.forEach(([a0,a1,n])=>{
 });
 function draw(){
  const au=$('#au'),dt=+$('#dt').value||16.666;
- const i=S.fr?Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(dt/1000)))):-1;
+ const playTime=(webPlayNode&&webPlayCtx)?Math.max(0,webPlayCtx.currentTime-webPlayStartedAt):(au.currentTime||0);
+ const i=S.fr?Math.min(S.F-1,Math.max(0,Math.floor(playTime/(dt/1000)))):-1;
  const vals=i>=0?S.fr.subarray(i*N,i*N+N):null;
  const level=vals?Math.sqrt(vals.reduce((s,v)=>s+(v/4095)*(v/4095),0)/N):0;
  const peak=vals?Math.max(...vals)/4095:0;
