@@ -707,7 +707,6 @@ $('#au').addEventListener('timeupdate',()=>{
   const au=$('#au');if($('#manualClock'))$('#manualClock').textContent=formatTime(au.currentTime);
   if($('#manualSeek')&&au.duration)$('#manualSeek').value=String(au.currentTime/au.duration);
 });
-$('
 $('#dt').addEventListener('input',()=>{
   if(!S.buf)return;
   if(modeValue()==='manual'){
