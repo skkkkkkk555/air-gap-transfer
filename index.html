@@ -147,14 +147,14 @@ async function convertBufferToOgg(audioBuffer){
   const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
   progress(4,'OGG(Vorbis)変換を開始…');
   await new Promise(r=>setTimeout(r,0));
-  const encoder=new Encoder(sampleRate,channels,.5);
-  const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
+  const encoder=new Encoder(sampleRate,channels,.2);
+  const chunkSize=Math.max(16384,Math.floor(sampleRate*1.0));
   for(let pos=0;pos<total;pos+=chunkSize){
     const end=Math.min(total,pos+chunkSize);
     const data=[];
     for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
     encoder.encode(data);
-    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
+    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ高速変換中…');
     await new Promise(r=>setTimeout(r,0));
   }
   const blob=encoder.finish('audio/ogg');
@@ -222,11 +222,10 @@ $('#f').onchange=async e=>{
 };
 /* ---- 解析・演出 ---- */
 function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
 async function gen(){
  if(!S.buf)throw Error('先に音源を選択してください');
  const dtm=+$('#dt').value;if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間が正しくありません');
- const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.floor(b.length/hop)),W=1024,H=W/2;
+ const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.floor(b.length/hop)),W=512,H=W/2;
  const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
  const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
  const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
@@ -237,27 +236,68 @@ async function gen(){
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%8==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
+  if(t%32==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'高速解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
   for(let t=0;t<n;t++){const p=t/bl-.5,j=Math.floor(p),f=p-j,m0=sc[Math.max(0,Math.min(nb-1,j))],m1=sc[Math.max(0,Math.min(nb-1,j+1))],m=Math.max(m0+(m1-m0)*f,lo+(gm-lo)*.35);o[t]=Math.max(0,Math.min(1.1,(col[t]-lo)/(m-lo+1e-6)))}return o};
- const sens=+$('#sens').value,pick=f=>{const n=f.length,P=new Float32Array(n+1);for(let i=0;i<n;i++)P[i+1]=P[i]+f[i];const g=Float32Array.from(f).sort()[Math.floor(n*.98)]||1,w=Math.round(.4/dt),gap=Math.round(.09/dt),ev=new Float32Array(n);let last=-1e9;
+ const sens=Math.max(.75,+$('#sens').value),pick=f=>{const n=f.length,P=new Float32Array(n+1);for(let i=0;i<n;i++)P[i+1]=P[i]+f[i];const g=Float32Array.from(f).sort()[Math.floor(n*.98)]||1,w=Math.round(.4/dt),gap=Math.round(.09/dt),ev=new Float32Array(n);let last=-1e9;
   for(let t=3;t<n-3;t++){const a=Math.max(0,t-w),c=Math.min(n,t+w),m=(P[c]-P[a])/(c-a),v=f[t];if(v<m*1.5/sens+.1*g/sens)continue;let ok=1;for(let q=-3;q<=3;q++)if(f[t+q]>v){ok=0;break}if(!ok||t-last<gap)continue;ev[t]=Math.min(1,.35+.65*v/g);last=t}return ev};
  const K=pick(fl[0]),Sn=pick(fl[1]),Hh=pick(fl[2]),bn=Bd.map(lnorm),ln=lnorm(L),ls=new Float32Array(F),W1=Math.max(1,Math.round(1/dt));let ac=0;for(let t=0;t<F;t++){ac+=ln[t];if(t>=W1)ac-=ln[t-W1];ls[t]=Math.min(1,ac/Math.min(t+1,W1))}
  const G=+$('#gain').value,D=+$('#dec').value,V=+$('#spd').value,tail=2+(D-.7)*40,raw=new Uint16Array(F*N),A=new Float32Array(11),pa=new Float32Array(11),bf=new Float32Array(5);
  let kb=[],sw=[],sp=[],dir=1,cur=0,sf=0,rs=12345;const rnd=()=>(rs=(rs*1664525+1013904223)>>>0)/4294967296;
  for(let t=0;t<F;t++){
-  if(K[t]){kb.push({a:0,s:K[t]});cur=(cur+1)%5;bf[cur]=Math.max(bf[cur],K[t])}
-  if(Sn[t]){sw.push({a:0,s:Sn[t],d:dir});dir=-dir;sf=Math.max(sf,Sn[t])}
-  if(Hh[t]){const n=2+(rnd()*2|0);for(let j=0;j<n;j++)sp.push({a:0,z:rnd()*20|0,s:Hh[t]})}
-  const v=new Float32Array(N),base=.1*(bn[0][t]+bn[1][t])/2;for(let i=0;i<20;i++)v[i]=base;
-  kb=kb.filter(k=>{const r=k.a*1.1*V,amp=k.s*Math.exp(-k.a/(5+tail));if(amp<.02||r>16)return false;for(let i=0;i<20;i++){const d=Math.abs(i-9.5);v[i]+=amp*(Math.exp(-((d-r)*(d-r))/5)+(d<r?.25*Math.exp(-(r-d)/4):0))}k.a++;return true});
-  sw=sw.filter(w=>{const hd=w.d>0?w.a*1.5*V:19-w.a*1.5*V,amp=w.s*Math.exp(-w.a/(10+tail));if(amp<.03||(w.d>0?hd-tail*2>19:hd+tail*2<0))return false;for(let i=0;i<20;i++){const bh=(hd-i)*w.d;v[i]+=.9*amp*(bh>=0?Math.exp(-bh/(tail*.5)):Math.exp(bh*2))}w.a++;return true});
-  sp=sp.filter(q=>{const amp=q.s*Math.exp(-q.a/3);if(q.a>14)return false;v[q.z]+=.8*amp;v[(q.z+1)%20]+=.4*amp;q.a++;return true});
-  for(let k=0;k<11;k++){const bi=10-k,e=Math.pow(bn[bi][t],1.3);A[k]=e>A[k]?e:A[k]*.86;pa[k]=Math.max(e,pa[k]*.93);v[20+k]=.85*A[k]+.25*pa[k]}
-  for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
-  const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
+  const v=new Float32Array(N);
+  const pulse=Math.max(K[t]||0,Sn[t]||0,Hh[t]||0);
+  // 20 arc zones: spectral color + moving wave + stereo-like asymmetry.
+  for(let i=0;i<20;i++){
+    const u=i/19*10, k=Math.min(9,Math.floor(u)), f=u-k;
+    const e=(bn[k][t]*(1-f)+bn[Math.min(10,k+1)][t]*f);
+    const mirror=bn[Math.min(10,Math.floor((1-u/10)*10))][t];
+    const wave=.5+.5*Math.sin(t*.23+i*.72);
+    const sweep=.5+.5*Math.sin(t*.075-i*.95);
+    const beat=(K[t]||0)*(.35+.65*(i%5)/4);
+    v[i]=.10+.72*e+.18*mirror+.16*wave*e+.12*sweep*(.3+e)+beat;
+  }
+  // Kick: expanding ring.
+  if(K[t]){
+    const kk=K[t];
+    for(let i=0;i<20;i++){
+      const d=Math.min(i,19-i);
+      v[i]+=kk*Math.exp(-Math.pow(d-((t%7)+1),2)/4.5);
+    }
+  }
+  // Snare: alternating left/right sweep.
+  if(Sn[t]){
+    const side=t%2;
+    for(let i=0;i<20;i++) if((i+side)%3===0) v[i]+=.7*Sn[t];
+  }
+  // Hat: fine sparkling motion across the ring.
+  if(Hh[t]){
+    for(let j=0;j<3;j++){
+      const z=(Math.floor(t*.7)+j*7)%20;
+      v[z]+=.9*Hh[t];
+      v[(z+1)%20]+=.38*Hh[t];
+    }
+  }
+  // 11 frequency zones + 5 event zones = full 36-zone variation.
+  for(let k=0;k<11;k++){
+    const e=Math.pow(bn[k][t],1.15);
+    A[k]=e>A[k]?e:A[k]*.82;
+    pa[k]=Math.max(e,pa[k]*.90);
+    v[20+k]=Math.min(1.25,.72*A[k]+.42*pa[k]+.18*e);
+  }
+  for(let k=0;k<5;k++){
+    const beat=Math.max(K[t]||0,Sn[t]||0,Hh[t]||0);
+    v[31+k]=Math.min(1.25,beat*(.55+.45*Math.sin(t*.17+k*1.7)**2)+bf[k]*.25+sf*.35);
+  }
+  if(K[t]){cur=(cur+1)%5;bf[cur]=Math.max(bf[cur],K[t]);}
+  if(Sn[t])sf=Math.max(sf,Sn[t]);
+  for(let k=0;k<5;k++)bf[k]*=.78;
+  sf*=.72;
+  const g=(.42+.58*ls[t])*G;
+  for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
+}
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
  S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false;progressDone('解析完了')}
 $('#go').onclick=async()=>{
