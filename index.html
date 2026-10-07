@@ -283,8 +283,14 @@ $('#f').onchange=async e=>{
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const audioUrl=URL.createObjectURL(f);
-  $('#au').src=audioUrl;
-  $('#au').load();
+  const au=$('#au');
+  au.pause();
+  au.removeAttribute('src');
+  au.load();
+  au.src=audioUrl;
+  au.load();
+  au.onerror=()=>say('音源を再生できません: '+(au.error?.message||'このブラウザが対応していない音声形式の可能性があります'),1);
+  au.onloadedmetadata=()=>{ if(au.duration&&Number.isFinite(au.duration)) $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒'; };
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
   let sourceIsOpus=false;
   if(isOgg){try{const pp=pages(originalU8),qq=packets(originalU8,pp);sourceIsOpus=new TextDecoder().decode(qq[0].data.subarray(0,8))==='OpusHead'}catch(_){}}
@@ -315,7 +321,7 @@ $('#f').onchange=async e=>{
   S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
   S.fr=null;
 
-  $('#au').load();$('#au').load();
+  $('#au').load();
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(reusableOgg)try{
@@ -336,8 +342,9 @@ $('#f').onchange=async e=>{
   progressDone('音源の準備完了');
  }catch(x){
   $('#progressWrap').classList.remove('show');
-  say('読み込めません: '+(x&&x.message||x),1);
-  gi('エラー','音源を読み込めませんでした。',f.name)
+  const em=x&&x.message||String(x);
+  say('解析できません: '+em,1);
+  gi('解析エラー','再生欄に音源が残っていれば、そのまま再生できます。',f.name);
  }
 };
 /* ---- 解析・演出 ---- */
