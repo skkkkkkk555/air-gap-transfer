@@ -300,16 +300,16 @@ async function loadOpusEncoder(){
  if(typeof mod.default!=='function')throw Error('Ogg Opusエンコーダーの初期化に失敗しました');
  return mod.default;
 }
-/* ---- Playback normalization: PCM -> Ogg Vorbis ---- */
-const getVorbisEncoder=()=>{
-  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG(Vorbis)変換エンジンを読み込めません');
+/* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
+function ensureOggEncoder(){
+  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG変換エンジンを読み込めません');
   return window.OggVorbisEncoder;
-};
-const convertBufferToPlaybackOgg=async(audioBuffer)=>{
-  const Encoder=getVorbisEncoder();
+}
+async function convertBufferToOgg(audioBuffer){
+  const Encoder=ensureOggEncoder();
   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
   const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
-  progress(3,'OGG(Vorbis)へ変換中…');
+  progress(4,'OGG(Vorbis)変換を開始…');
   await new Promise(r=>setTimeout(r,0));
   const encoder=new Encoder(sampleRate,channels,.5);
   const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
@@ -318,39 +318,13 @@ const convertBufferToPlaybackOgg=async(audioBuffer)=>{
     const data=[];
     for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
     encoder.encode(data);
-    progress(5+end/Math.max(1,total)*85,'OGG(Vorbis)へ変換中…');
+    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
     await new Promise(r=>setTimeout(r,0));
   }
   const blob=encoder.finish('audio/ogg');
-  if(!blob||blob.size<64)throw Error('OGG(Vorbis)変換結果が空です');
+  if(!blob||blob.size<64)throw Error('OGG変換結果が空です');
+  progressDone('OGG変換完了');
   return new Uint8Array(await blob.arrayBuffer());
-};
-
-async function convertBufferToOgg(audioBuffer){
- progress(0,'Composer互換Ogg Opusへ高速変換中…',true);
- gi('OGG変換中…','WASM/libopusを準備しています。',S.name);
- say('Composer互換Ogg Opusへ変換中…');
- await new Promise(r=>setTimeout(r,0));
- let enc=null;
- try{
-   const opus=await loadOpusEncoder();
-   gi('OGG変換中…','WASM/libopusでComposer互換Ogg Opusを生成しています。',S.name);
-   progress(5,'Ogg Opusエンコーダーを準備中…');
-   await new Promise(r=>setTimeout(r,0));
-   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
-   const data=channels===1?audioBuffer.getChannelData(0):Array.from({length:channels},(_,ch)=>audioBuffer.getChannelData(ch));
-   enc=await opus({sampleRate:audioBuffer.sampleRate,channels,bitrate:96,application:'audio',complexity:2});
-   progress(15,'Ogg Opusをエンコード中…');
-   await new Promise(r=>setTimeout(r,0));
-   const out=cat([enc.encode(data),enc.flush()]);
-   enc.free();enc=null;
-   if(!(out instanceof Uint8Array)||out.length<64)throw Error('Ogg Opus変換結果が空です');
-   progressDone('Ogg Opus変換完了');
-   return out;
- }catch(x){
-   try{if(enc)enc.free()}catch(_){}
-   throw Error('Ogg Opus変換に失敗しました: '+(x&&x.message||x));
- }
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
@@ -364,6 +338,7 @@ const isOggVorbis= u=>{
   }catch(_){return false}
 };
 function packets(u,P){const out=[];let cur=[],start=0;for(let k=0;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const n of p.seg){if(cur.length===0)start=k;cur.push(u.subarray(o,o+n));o+=n;if(n<255){out.push({data:cat(cur),startPage:start,endPage:k});cur=[]}}}return out}
+function headers(u,P){const pk=[];let cur=[],k=0;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){cur.push(u.subarray(o,o+s));o+=s;if(s<255){pk.push(cat(cur));cur=[]}}if(pk.length>=3)break}return{pk,last:k}}
 function parseC(p){const td=new TextDecoder(),m=td.decode(p.subarray(0,8)),opus=m==='OpusTags',vorbis=td.decode(p.subarray(0,7))==='\u0003vorbis';if(!opus&&!vorbis)throw Error('OGGコメントヘッダーが不正です');const d=new DataView(p.buffer,p.byteOffset,p.byteLength);let o=opus?8:7;const vl=d.getUint32(o,true);o+=4;if(o+vl>p.length)throw Error('OGGベンダー情報が不正です');const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;if(o+l>p.length)throw Error('OGGコメントが不正です');c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c,opus}}
 function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[te.encode('OpusTags'),u32(v.length),v,u32(c.length)];for(const s of c){const e=te.encode(s);q.push(u32(e.length),e)}return cat(q)}
 function makePacketPages(packet,serial,seq,flags,granule){
@@ -404,130 +379,49 @@ function rewrite(u,meta){
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.u8=null;S.ogg=false;S.sourceOgg=false;S.converted=false;S.fr=null;S.F=0;S.tpl=null;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込んでいます…',true);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));
-
- const au=$('#au');
- if(!au)throw Error('音声プレーヤーが見つかりません');
- au.onerror=null;
- au.onloadedmetadata=null;
- au.oncanplay=null;
- au.onloadeddata=null;
- const mime=guessAudioMime(f);
- let fallbackTimer=null;
- const clearFallbackTimer=()=>{if(fallbackTimer){clearTimeout(fallbackTimer);fallbackTimer=null}};
- const showNativeDiag=()=>{
-   const er=au.error,code=er?er.code:0;
-   const detail=code===1?'読み込みが中断':code===2?'データ取得エラー':code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':'不明なメディアエラー';
-   say('再生失敗：'+detail+' / MIME='+(mime||f.type||'不明')+' / code='+code+' / readyState='+au.readyState+' / networkState='+au.networkState+' / 経路='+currentAudioMode,1);
- };
- au.onerror=async()=>{
-   clearFallbackTimer();
-   if(currentAudioMode==='blob'){
-     say('検証：blob再生失敗 → Data URLへ切替',1);
-     try{await dataUrlFallback(f,au);return}catch(_){}
-   }
-   showNativeDiag();
-   if($('#webPlay'))$('#webPlay').style.display=S.buf?'inline-block':'none';
- };
- au.onloadedmetadata=()=>{
-   clearFallbackTimer();
-   if(au.duration&&Number.isFinite(au.duration)){
-     $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒 / native='+currentAudioMode+' / '+Math.round(au.duration*10)/10+'秒';
-   }
- };
- au.oncanplay=()=>{clearFallbackTimer()};
- au.onloadeddata=()=>{clearFallbackTimer()};
- await setNativeFileSource(f);
- // Some Android builds hang on blob media without firing error. Do not wait forever.
- fallbackTimer=setTimeout(async()=>{
-   if(currentAudioMode==='blob'&&au.readyState<1){
-     say('検証：blob再生が一定時間応答しない → Data URLへ切替',1);
-     try{
-       await dataUrlFallback(f,au);
-       setTimeout(()=>{
-         if(au.readyState<1&&$('#webPlay')&&S.buf)$('#webPlay').style.display='inline-block';
-       },2500);
-     }catch(e){
-       say('Data URL切替失敗: '+(e&&e.message||e),1);
-       if($('#webPlay'))$('#webPlay').style.display=S.buf?'inline-block':'none';
-     }
-   }
- },3000);
-
+ S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
-  let sourceIsOpus=false;
-  if(isOgg){try{const pp=pages(originalU8),qq=packets(originalU8,pp);sourceIsOpus=new TextDecoder().decode(qq[0].data.subarray(0,8))==='OpusHead'}catch(_){}}
-  const reusableOgg=isOgg&&sourceIsOpus;
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
+  const ctx=new AC();
   progress(2,'音声を読み込み中…',true);
-  let ctx=null;
-  try{
-    ctx=new AC();
-    const pcm=original.slice(0);
-    S.buf=await new Promise((resolve,reject)=>{
-      let settled=false;
-      const ok=v=>{if(!settled){settled=true;resolve(v)}};
-      const ng=err=>{if(!settled){settled=true;reject(err||new Error('音声デコードに失敗しました'))}};
-      try{
-        const r=ctx.decodeAudioData(pcm,ok,ng);
-        if(r&&typeof r.then==='function')r.then(ok).catch(ng);
-      }catch(err){ng(err)}
-    });
-  }finally{
-    if(ctx&&ctx.close)try{await ctx.close()}catch(_){}
+  S.buf=await ctx.decodeAudioData(original.slice(0));
+  if(ctx.close)try{await ctx.close()}catch(_){}
+  let displayFile=f;
+  if(isOgg){S.u8=originalU8;S.ogg=true}
+  else{
+    progress(3,'OGG(Vorbis)へ自動変換を開始…');
+    const ogg=await convertBufferToOgg(S.buf);
+    S.u8=ogg;S.ogg=true;S.converted=true;
+    displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
   }
-  if(!S.buf||!S.buf.length)throw Error('音声データをデコードできませんでした');
-  $('#webPlay').style.display='inline-block';
-  $('#webPlay').textContent='▶ 互換再生（Web Audio）';
-
-  // Native playback uses Ogg Vorbis, matching the old known-good pipeline.
-  // The original source remains untouched for analysis/export.
-  let playbackU8=null;
-  const inputIsVorbis=isOgg && isOggVorbis(originalU8);
-  if(inputIsVorbis){
-    playbackU8=originalU8;
-  }else{
-    playbackU8=await convertBufferToPlaybackOgg(S.buf);
-  }
-  releaseAudioUrl();
-  const playbackFile=new File([playbackU8],S.name+'.ogg',{type:'audio/ogg'});
-  currentAudioUrl=URL.createObjectURL(playbackFile);
-  currentAudioMode='vorbis-ogg';
-  au.src=currentAudioUrl;
-  au.load();
-  $('#info').textContent=S.buf.duration.toFixed(1)+'秒 / 再生用OGG(Vorbis)';
-
-  S.sourceOgg=reusableOgg;
-  if(reusableOgg)S.u8=originalU8,S.ogg=true;
-  S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
-  S.fr=null;
-  let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
-  if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
-  if(reusableOgg)try{
-   const P=pages(S.u8),pk=packets(S.u8,P);const{c}=parseC(pk[1].data);
-   const a=c.find(s=>/^AUTHOR=/i.test(s));
-   if(a){
-    const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
-    const rows=txt.split(/\r?\n/).filter(x=>x.trim());
-    const cols=rows[0].split(',').filter(x=>x!=='').length;
-    S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
-    $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-    msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
-   }
-      const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1){try{S.tpl=S.tpl||{};S.tpl.custom1=await inflate(Uint8Array.from(atob(o1.slice(8).replace(/\s/g,'')),ch=>ch.charCodeAt(0)))}catch(_){S.tpl=S.tpl||{};S.tpl.custom1=o1.slice(8)}msg+='\nCUSTOM1タグを検出(そのまま引き継ぎます)';}
+  $('#au').src=URL.createObjectURL(displayFile);S.fr=null;S.tpl=null;
+  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
+  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
+  if(isOgg)try{
+    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
+    const a=c.find(s=>/^AUTHOR=/i.test(s));
+    if(a){
+      const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
+      const rows=txt.split(/\r?\n/).filter(x=>x.trim());
+      const cols=rows[0].split(',').filter(x=>x!=='').length;
+      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+      $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
+      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+    }
+    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
+  gi('準備完了','「点灯データを生成」を押してください。',f.name);
   $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
-  say('「点灯データを生成」を押してください');
+  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
   progressDone('音源の準備完了');
  }catch(x){
   $('#progressWrap').classList.remove('show');
-  const em=x&&x.message||String(x);
-  say('解析できません: '+em,1);
-  gi('解析エラー','再生欄に音源が残っていれば、そのまま再生できます。',f.name);
+  say('読み込めません: '+(x&&x.message||x),1);
+  gi('エラー','音源を読み込めませんでした。',f.name)
  }
 };
 /* ---- 解析・演出 ---- */
