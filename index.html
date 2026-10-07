@@ -183,9 +183,9 @@ const progress=(pct,text,ind=false)=>{
 const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),1600)};
 
 const GI_GEOM={
-  C:{from:160,to:220,n:20,cx:180,cy:174,r:128},
-  A:{from:-12,to:30,n:11,cx:180,cy:174,r:128},
-  B:{x1:118,y1:246,x2:88,y2:216}
+  C:{from:168,to:278,n:20,cx:180,cy:174,r:128},
+  A:{from:-38,to:58,n:11,cx:180,cy:174,r:128},
+  B:{from:98,to:158,n:5,cx:180,cy:174,r:128}
 };
 const GI_RING=Array.from({length:11},(_,i)=>20+i).concat(Array.from({length:5},(_,i)=>31+i),Array.from({length:20},(_,i)=>i));
 const GI_RING_POS=new Uint8Array(36);GI_RING.forEach((z,p)=>GI_RING_POS[z]=p);
@@ -214,10 +214,9 @@ function renderGIMap(){
     add(20+k,'M '+p[0].toFixed(2)+' '+p[1].toFixed(2)+' A '+GI_GEOM.A.r+' '+GI_GEOM.A.r+' 0 0 1 '+q[0].toFixed(2)+' '+q[1].toFixed(2),'A'+(k+1));
   }
   for(let k=0;k<5;k++){
-    const f=k/5,g=(k+1)/5;
-    const x1=GI_GEOM.B.x1+(GI_GEOM.B.x2-GI_GEOM.B.x1)*f,y1=GI_GEOM.B.y1+(GI_GEOM.B.y2-GI_GEOM.B.y1)*f;
-    const x2=GI_GEOM.B.x1+(GI_GEOM.B.x2-GI_GEOM.B.x1)*g,y2=GI_GEOM.B.y1+(GI_GEOM.B.y2-GI_GEOM.B.y1)*g;
-    add(31+k,'M '+x1.toFixed(2)+' '+y1.toFixed(2)+' L '+x2.toFixed(2)+' '+y2.toFixed(2),'B'+(k+1));
+    const a=GI_GEOM.B.from+(GI_GEOM.B.to-GI_GEOM.B.from)*k/5,b=GI_GEOM.B.from+(GI_GEOM.B.to-GI_GEOM.B.from)*(k+1)/5;
+    const p=pointOnArc(GI_GEOM.B.cx,GI_GEOM.B.cy,GI_GEOM.B.r,a),q=pointOnArc(GI_GEOM.B.cx,GI_GEOM.B.cy,GI_GEOM.B.r,b);
+    add(31+k,'M '+p[0].toFixed(2)+' '+p[1].toFixed(2)+' A '+GI_GEOM.B.r+' '+GI_GEOM.B.r+' 0 0 1 '+q[0].toFixed(2)+' '+q[1].toFixed(2),'B'+(k+1));
   }
 }
 const formatTime=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+(s%60).toFixed(1).padStart(4,'0');
@@ -306,7 +305,7 @@ const findZone=e=>{const g=e.target&&e.target.closest?e.target.closest('.gi-zone
 const manualTap=(k,t)=>{
   if(modeValue()!=='manual'||k<0)return;
   if(S.manualEvents.length>1500)S.manualEvents.splice(0,300);
-  S.manualEvents.push({k:k,t:t,fx:$('#manualFx').value,a:+$('#manualBright').value||1});
+  S.manualEvents.push({k:k,t:t,fx:$('#manualFx').value,a:1});
   rebuildManual();
 };
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
@@ -757,7 +756,7 @@ $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 
 /* ---- プレビュー ---- */
 const cv=$('#cv'),cx=cv.getContext('2d'),CX=160,CY=150,R=133;
-const ARC=[[160,220,20],[-12,30,11],[138,163,5]],Z=[];
+const ARC=[[168,278,20],[-38,58,11],[98,158,5]],Z=[];
 ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
 function draw(){
  const au=$('#au'),dt=+$('#dt').value||16.666;
