@@ -47,8 +47,8 @@ canvas{width:300px;height:329px;max-width:100%}
 <div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
 
 <section><h2>3. 書き出し</h2>
-<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.667"></label>
-<label>CUSTOM1タグ(空欄なら元のOGGの値を引き継ぐ)<input type="text" id="c1"></label>
+<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.666"></label>
+<label>CUSTOM1元データ（空欄なら元データを引き継ぐ）<input type="text" id="c1"></label>
 <button class="main" id="ex" disabled>OGGを書き出す</button>
 <button id="csv" disabled>CSVを保存</button>
 <div id="st"></div></section>
@@ -65,13 +65,15 @@ const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new Decom
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
 const crc=b=>{let c=0;for(let i=0;i<b.length;i++)c=((c<<8)^T[((c>>>24)^b[i])&255])>>>0;return c};
-function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
+function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103&&u[o+2]==103&&u[o+3]==83){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
 function headers(u,P){const pk=[];let cur=[],k=0;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){cur.push(u.subarray(o,o+s));o+=s;if(s<255){pk.push(cat(cur));cur=[]}}if(pk.length>=3)break}return{pk,last:k}}
-function parseC(p){const d=new DataView(p.buffer,p.byteOffset,p.byteLength),td=new TextDecoder();let o=7;const vl=d.getUint32(o,true);o+=4;const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
-function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});q.push(new Uint8Array([1]));return cat(q)}
-function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{for(let i=0;i<Math.floor(p.length/255);i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255);li+=seg.length;const len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]==255?1:0}return{out,seq}}
-function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<3)throw Error('OGGの構造を読めません');if(String.fromCharCode(...pk[0].subarray(1,7))!=='vorbis')throw Error('Vorbis形式のOGGのみ対応です(Opusは不可)');const{vendor,c}=parseC(pk[1]);const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1)=/i.test(s));const old1=c.find(s=>/^CUSTOM1=/i.test(s));const v1=$('#c1').value.trim();keep.push('AUTHOR='+author);if(v1)keep.push('CUSTOM1='+v1);else if(old1)keep.push(old1);const serial=u.subarray(P[0].o+14,P[0].o+18);const np=paginate([buildC(vendor,keep),pk[2]],serial,1);const parts=[u.subarray(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end);new DataView(pg.buffer).setUint32(18,seq++,true);new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
-
+function readU32(u,o){if(o+4>u.length)throw Error('OGGヘッダーが壊れています');return new DataView(u.buffer,u.byteOffset+o,4).getUint32(0,true)}
+function pageSeq(u,p){return readU32(u,p.o+18)}
+function codecFromIdentification(p){const td=new TextDecoder();if(p.length>=8&&td.decode(p.subarray(0,8))==='OpusHead')return'opus';if(p.length>=7&&p[0]===1&&td.decode(p.subarray(1,7))==='vorbis')return'vorbis';return null}
+function parseC(p){const td=new TextDecoder(),s8=td.decode(p.subarray(0,8));let o;if(s8==='OpusTags')o=8;else if(p.length>=7&&p[0]===3&&td.decode(p.subarray(1,7))==='vorbis')o=7;else throw Error('対応していないコメント形式です');const vl=readU32(p,o);o+=4;if(o+vl+4>p.length)throw Error('コメントヘッダーが壊れています');const vendor=p.slice(o,o+vl);o+=vl;const n=readU32(p,o);o+=4;const c=[];for(let i=0;i<n;i++){const l=readU32(p,o);o+=4;if(o+l>p.length)throw Error('コメント長が壊れています');c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
+function buildC(v,c,codec){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[codec==='opus'?te.encode('OpusTags'):new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});if(codec!=='opus')q.push(new Uint8Array([1]));return cat(q)}
+function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{const full=Math.floor(p.length/255);for(let i=0;i<full;i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255),len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]===255?1:0}return{out,seq}}
+async function rewrite(u,author){const P=pages(u),Hh=headers(u,P),pk=Hh.pk;if(pk.length<3)throw Error('OGGのヘッダーを読めません');const codec=codecFromIdentification(pk[0]);if(!codec)throw Error('Vorbis/Opus以外のOGGには対応していません');if(codec!=='opus')throw Error('Phone (3a) のComposer用OGGはOpus形式が必要です。入力をOpus OGGにしてください');const parsed=parseC(pk[1]),vendor=parsed.vendor,c=parsed.c,title=c.find(s=>/^TITLE=/i.test(s)),album=c.find(s=>/^ALBUM=/i.test(s)),old1=c.find(s=>/^CUSTOM1=/i.test(s));const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1|COMPOSER|CUSTOM2|TITLE|ALBUM)=/i.test(s));keep.push('TITLE='+(title?title.slice(6):S.name));keep.push('ALBUM='+(album?album.slice(6):'CUSTOM'));keep.push('AUTHOR='+author);keep.push('COMPOSER=v1-Asteroids Glyph Composer');keep.push('CUSTOM2=36cols');const user=$('#c1').value.trim();let c1='';if(user)c1=user;else if(old1)c1=await inflate(Uint8Array.from(atob(old1.slice(8)),ch=>ch.charCodeAt(0)));keep.push('CUSTOM1='+b64(await deflate(c1)));const serial=u.subarray(P[0].o+14,P[0].o+18),seq0=pageSeq(u,P[1]);const np=paginate([buildC(vendor,keep,codec),pk[2]],serial,seq0);const parts=[u.slice(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=Hh.last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end),dv=new DataView(pg.buffer,pg.byteOffset,pg.byteLength);dv.setUint32(18,seq++,true);dv.setUint32(22,0,true);dv.setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.name=f.name.replace(/\.[^.]+$/,'');say('読み込み中…');
  try{const ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=String.fromCharCode(...S.u8.subarray(0,4))==='OggS';
@@ -84,10 +86,8 @@ $('#f').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.name=f.name.
 ['gain','dec','spd','sens','lat'].forEach((id,i)=>$('#'+id).oninput=e=>$('#v'+(i+1)).textContent=(+e.target.value).toFixed(id=='dec'?2:id=='lat'?0:1));
 
 /* ---- 解析・演出 ---- */
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
-async function gen(){
- const b=S.buf,sr=b.sampleRate,dtm=+$('#dt').value,dt=dtm/1000,hop=sr*dt,F=Math.floor(b.length/hop),W=1024,H=W/2;
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}async function gen(){
+ const b=S.buf;if(!b)throw Error('音源を選択してください');const sr=b.sampleRate,dtm=+$('#dt').value;if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間は0より大きい数値にしてください');if(Math.abs(dtm-16.666)>0.02)throw Error('Phone (3a) Composer互換のため1行=16.666msにしてください');const dt=dtm/1000,hop=sr*dt,F=Math.floor(b.length/hop),W=1024,H=W/2;if(F<1)throw Error('音源が短すぎます');
  const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
  const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
  const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
@@ -124,9 +124,9 @@ async function gen(){
 $('#go').onclick=()=>{$('#go').disabled=true;gen().catch(e=>say('生成に失敗: '+e.message,1)).finally(()=>$('#go').disabled=false)};
 
 /* ---- 書き出し ---- */
-function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
+function csvText(){const rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+',');return rows.join('\r\n')+'\r\n'}
 const dl=(u,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u]));a.download=n;a.click()};
-$('#ex').onclick=async()=>{try{const z=await deflate(csvText());const out=rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。公式Composerのライブラリから取り込んでください')}catch(e){say(e.message,1)}};
+$('#ex').onclick=async()=>{try{if(!S.ogg)throw Error('OGG入力が必要です');const z=await deflate(csvText());const out=await rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。3a用Composer形式のOGGを生成しました')}catch(e){say(e.message,1)}};
 $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 
 /* ---- プレビュー ---- */
@@ -135,7 +135,7 @@ const ARC=[[163,120,20],[14,-30,11],[229,211,5]],Z=[];
 ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
 function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTime/(+$('#dt').value/1000))):-1,rd=d=>-d*Math.PI/180;
  cx.setTransform(2,0,0,2,0,0);cx.clearRect(0,0,310,340);cx.shadowBlur=0;
- cx.beginPath();cx.roundRect(2,3,306,420,44);cx.fillStyle='#1a1a1a';cx.fill();
+ cx.beginPath();cx.roundRect(2,3,306,326,44);cx.fillStyle='#1a1a1a';cx.fill();
  cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
  cx.lineCap='round';cx.lineWidth=8;
  for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=\`rgba(255,255,255,\u0024{.1+.9*v})\`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
