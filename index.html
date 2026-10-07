@@ -147,17 +147,21 @@ async function loadOpusEncoder(){
  return mod.default;
 }
 async function convertBufferToOgg(audioBuffer){
- const opus=await loadOpusEncoder();
- const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
  progress(0,'Composer互換Ogg Opusへ高速変換中…',true);
- gi('OGG変換中…','WASM/libopusでComposer互換Ogg Opusを生成しています。',S.name);
+ gi('OGG変換中…','WASM/libopusを準備しています。',S.name);
  say('Composer互換Ogg Opusへ変換中…');
  await new Promise(r=>setTimeout(r,0));
  let enc=null;
  try{
+   const opus=await loadOpusEncoder();
+   gi('OGG変換中…','WASM/libopusでComposer互換Ogg Opusを生成しています。',S.name);
+   progress(5,'Ogg Opusエンコーダーを準備中…');
+   await new Promise(r=>setTimeout(r,0));
+   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
    const data=channels===1?audioBuffer.getChannelData(0):Array.from({length:channels},(_,ch)=>audioBuffer.getChannelData(ch));
    enc=await opus({sampleRate:audioBuffer.sampleRate,channels,bitrate:96,application:'audio',complexity:2});
-   progress(10,'Ogg Opusエンコード中…');
+   progress(15,'Ogg Opusをエンコード中…');
+   await new Promise(r=>setTimeout(r,0));
    const out=cat([enc.encode(data),enc.flush()]);
    enc.free();enc=null;
    if(!(out instanceof Uint8Array)||out.length<64)throw Error('Ogg Opus変換結果が空です');
@@ -334,9 +338,9 @@ async function gen(){
   for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
 }
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
+ S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;gi('解析完了','点灯データの生成が完了しました。',S.name);progressDone('解析完了')}
 $('#go').onclick=async()=>{
-  $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);progress(0,'解析を準備中…');
+  $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));progress(0,'解析を準備中…');
   progress(0,'解析を準備中…');
   try{await gen()}catch(e){progressDone('解析失敗');say('生成に失敗: '+(e&&e.message||e),1);gi('エラー','解析に失敗しました。',S.name)}finally{$('#go').disabled=false}
 };
