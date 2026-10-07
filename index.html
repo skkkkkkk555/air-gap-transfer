@@ -11,7 +11,22 @@ if(location.search.includes('swclean=1')){
 </script>
 <title>Glyphトーン工房 3a</title>
 <script>
-/* Local-page-safe Vorbis encoder. No ffmpeg, no worker, no dynamic module import. */
+(async()=>{
+  try{
+    if('serviceWorker' in navigator){
+      const rs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r=>r.unregister()));
+    }
+    if('caches' in window){
+      const ks=await caches.keys();
+      await Promise.all(ks.map(k=>caches.delete(k)));
+    }
+  }catch(_){}
+})();
+</script>
+
+<script>
+/* Browser-local Vorbis encoder. */
 var OggVorbisEncoderConfig={memoryInitializerPrefixURL:'https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/'};
 </script>
 <script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.min.js"></script>
