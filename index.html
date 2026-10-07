@@ -335,7 +335,7 @@ async function gen(){
   for(let k=0;k<5;k++)bf[k]*=.78;
   sf*=.72;
   const g=(.42+.58*ls[t])*G;
-  for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
+  for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.55));
 }
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
  S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;gi('解析完了','点灯データの生成が完了しました。',S.name);progressDone('解析完了')}
