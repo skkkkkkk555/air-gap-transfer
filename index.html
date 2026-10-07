@@ -186,6 +186,55 @@ function renderGIMap(){
   }
 }
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
+let currentAudioUrl=null,currentAudioMode='';
+const guessAudioMime=file=>{
+  if(file.type)return file.type;
+  const n=(file.name||'').toLowerCase();
+  if(n.endsWith('.mp3'))return 'audio/mpeg';
+  if(n.endsWith('.wav'))return 'audio/wav';
+  if(n.endsWith('.ogg'))return 'audio/ogg';
+  if(n.endsWith('.opus'))return 'audio/ogg; codecs=opus';
+  if(n.endsWith('.m4a'))return 'audio/mp4';
+  if(n.endsWith('.aac'))return 'audio/aac';
+  if(n.endsWith('.flac'))return 'audio/flac';
+  return '';
+};
+const releaseAudioUrl=()=>{
+  if(currentAudioUrl){try{URL.revokeObjectURL(currentAudioUrl)}catch(_){} currentAudioUrl=null}
+};
+const resetNativeAudio=au=>{
+  au.pause();au.removeAttribute('src');
+  try{au.srcObject=null}catch(_){}
+  au.load();
+};
+const setNativeFileSource=async(file)=>{
+  const au=$('#au');
+  if(!au)throw Error('音声プレーヤーが見つかりません');
+  releaseAudioUrl();
+  resetNativeAudio(au);
+  const mime=guessAudioMime(file);
+  const blob=mime&&file.type!==mime?new Blob([file],{type:mime}):file;
+  currentAudioUrl=URL.createObjectURL(blob);
+  currentAudioMode='blob';
+  au.src=currentAudioUrl;
+  au.load();
+  return {au,mime};
+};
+const dataUrlFallback=async(file,au)=>{
+  if(file.size>50*1024*1024)throw Error('Data URL fallback skipped: file is over 50 MB');
+  const data=await new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onerror=()=>reject(r.error||new Error('FileReader failed'));
+    r.onload=()=>resolve(r.result);
+    r.readAsDataURL(file);
+  });
+  releaseAudioUrl();
+  resetNativeAudio(au);
+  currentAudioMode='data-url';
+  au.src=data;
+  au.load();
+};
+
 window.addEventListener('error',e=>{
  const m=e&&e.error&&e.error.message||e&&e.message||'不明なJavaScriptエラー';
  try{say('実行エラー: '+m,1);gi('エラー','アプリの実行中にエラーが発生しました。',S.name)}catch(_){}
@@ -283,22 +332,24 @@ $('#f').onchange=async e=>{
 
  const au=$('#au');
  if(!au)throw Error('音声プレーヤーが見つかりません');
- const audioUrl=URL.createObjectURL(f);
- au.pause();
  au.onerror=null;
  au.onloadedmetadata=null;
- au.removeAttribute('src');
- au.load();
- au.onerror=()=>{
+ const mime=guessAudioMime(f);
+ au.onerror=async()=>{
    const er=au.error,code=er?er.code:0;
    const detail=code===1?'読み込みが中断':code===2?'データ取得エラー':code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':'不明なメディアエラー';
-   say('再生失敗：'+detail+' / MIME='+(f.type||'不明')+' / code='+code,1);
+   if(currentAudioMode==='blob'){
+     say('検証：blob:再生失敗 → Data URLへ自動切替 / '+detail+' / MIME='+(mime||'不明')+' / code='+code,1);
+     try{await dataUrlFallback(f,au);return}catch(_){}
+   }
+   say('再生失敗：'+detail+' / MIME='+(mime||'不明')+' / code='+code+' / 経路='+currentAudioMode,1);
  };
  au.onloadedmetadata=()=>{
-   if(au.duration&&Number.isFinite(au.duration)) $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒';
+   if(au.duration&&Number.isFinite(au.duration)){
+     $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒 / 再生経路='+currentAudioMode;
+   }
  };
- au.src=audioUrl;
- au.load();
+ await setNativeFileSource(f);
 
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
