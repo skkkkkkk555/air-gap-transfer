@@ -25,6 +25,11 @@ if(location.search.includes('swclean=1')){
 })();
 </script>
 
+<script>
+/* Browser-local Vorbis encoder for playback normalization. */
+var OggVorbisEncoderConfig={memoryInitializerPrefixURL:'https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/'};
+</script>
+<script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#777773;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -295,6 +300,32 @@ async function loadOpusEncoder(){
  if(typeof mod.default!=='function')throw Error('Ogg Opusエンコーダーの初期化に失敗しました');
  return mod.default;
 }
+/* ---- Playback normalization: PCM -> Ogg Vorbis ---- */
+const getVorbisEncoder=()=>{
+  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG(Vorbis)変換エンジンを読み込めません');
+  return window.OggVorbisEncoder;
+};
+const convertBufferToPlaybackOgg=async(audioBuffer)=>{
+  const Encoder=getVorbisEncoder();
+  const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
+  const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
+  progress(3,'OGG(Vorbis)へ変換中…');
+  await new Promise(r=>setTimeout(r,0));
+  const encoder=new Encoder(sampleRate,channels,.5);
+  const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
+  for(let pos=0;pos<total;pos+=chunkSize){
+    const end=Math.min(total,pos+chunkSize);
+    const data=[];
+    for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
+    encoder.encode(data);
+    progress(5+end/Math.max(1,total)*85,'OGG(Vorbis)へ変換中…');
+    await new Promise(r=>setTimeout(r,0));
+  }
+  const blob=encoder.finish('audio/ogg');
+  if(!blob||blob.size<64)throw Error('OGG(Vorbis)変換結果が空です');
+  return new Uint8Array(await blob.arrayBuffer());
+};
+
 async function convertBufferToOgg(audioBuffer){
  progress(0,'Composer互換Ogg Opusへ高速変換中…',true);
  gi('OGG変換中…','WASM/libopusを準備しています。',S.name);
@@ -325,6 +356,13 @@ async function convertBufferToOgg(audioBuffer){
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
 const crc=b=>{let c=0;for(let i=0;i<b.length;i++)c=((c<<8)^T[((c>>>24)^b[i])&255])>>>0;return c};
 function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]===79&&u[o+1]===103&&u[o+2]===103&&u[o+3]===83){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n)),end=o+27+n+seg.reduce((x,y)=>x+y,0);if(end>u.length)break;p.push({o,hdr:27+n,seg,end});o=end}return p}
+const isOggVorbis= u=>{
+  try{
+    const P=pages(u),pk=packets(u,P);
+    if(!pk.length)return false;
+    return new TextDecoder().decode(pk[0].data.subarray(0,7))==='\u0001vorbis';
+  }catch(_){return false}
+};
 function packets(u,P){const out=[];let cur=[],start=0;for(let k=0;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const n of p.seg){if(cur.length===0)start=k;cur.push(u.subarray(o,o+n));o+=n;if(n<255){out.push({data:cat(cur),startPage:start,endPage:k});cur=[]}}}return out}
 function parseC(p){const td=new TextDecoder(),m=td.decode(p.subarray(0,8)),opus=m==='OpusTags',vorbis=td.decode(p.subarray(0,7))==='\u0003vorbis';if(!opus&&!vorbis)throw Error('OGGコメントヘッダーが不正です');const d=new DataView(p.buffer,p.byteOffset,p.byteLength);let o=opus?8:7;const vl=d.getUint32(o,true);o+=4;if(o+vl>p.length)throw Error('OGGベンダー情報が不正です');const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;if(o+l>p.length)throw Error('OGGコメントが不正です');c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c,opus}}
 function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[te.encode('OpusTags'),u32(v.length),v,u32(c.length)];for(const s of c){const e=te.encode(s);q.push(u32(e.length),e)}return cat(q)}
@@ -445,7 +483,24 @@ $('#f').onchange=async e=>{
   if(!S.buf||!S.buf.length)throw Error('音声データをデコードできませんでした');
   $('#webPlay').style.display='inline-block';
   $('#webPlay').textContent='▶ 互換再生（Web Audio）';
-  
+
+  // Native playback uses Ogg Vorbis, matching the old known-good pipeline.
+  // The original source remains untouched for analysis/export.
+  let playbackU8=null;
+  const inputIsVorbis=isOgg && isOggVorbis(originalU8);
+  if(inputIsVorbis){
+    playbackU8=originalU8;
+  }else{
+    playbackU8=await convertBufferToPlaybackOgg(S.buf);
+  }
+  releaseAudioUrl();
+  const playbackFile=new File([playbackU8],S.name+'.ogg',{type:'audio/ogg'});
+  currentAudioUrl=URL.createObjectURL(playbackFile);
+  currentAudioMode='vorbis-ogg';
+  au.src=currentAudioUrl;
+  au.load();
+  $('#info').textContent=S.buf.duration.toFixed(1)+'秒 / 再生用OGG(Vorbis)';
+
   S.sourceOgg=reusableOgg;
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
   S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
