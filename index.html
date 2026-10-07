@@ -282,6 +282,9 @@ $('#f').onchange=async e=>{
  gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
+  const audioUrl=URL.createObjectURL(f);
+  $('#au').src=audioUrl;
+  $('#au').load();
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
   let sourceIsOpus=false;
   if(isOgg){try{const pp=pages(originalU8),qq=packets(originalU8,pp);sourceIsOpus=new TextDecoder().decode(qq[0].data.subarray(0,8))==='OpusHead'}catch(_){}}
@@ -312,7 +315,7 @@ $('#f').onchange=async e=>{
   S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
   S.fr=null;
 
-  $('#au').src=URL.createObjectURL(f);$('#au').load();
+  $('#au').load();$('#au').load();
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(reusableOgg)try{
