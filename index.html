@@ -185,7 +185,7 @@ const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').c
 const GI_GEOM={
   C:{from:160,to:220,n:20,cx:180,cy:174,r:128},
   A:{from:-12,to:30,n:11,cx:180,cy:174,r:128},
-  B:{x1:82,y1:246,x2:114,y2:210}
+  B:{x1:118,y1:246,x2:88,y2:216}
 };
 const GI_RING=Array.from({length:11},(_,i)=>20+i).concat(Array.from({length:5},(_,i)=>31+i),Array.from({length:20},(_,i)=>i));
 const GI_RING_POS=new Uint8Array(36);GI_RING.forEach((z,p)=>GI_RING_POS[z]=p);
@@ -707,9 +707,17 @@ $('#au').addEventListener('timeupdate',()=>{
   const au=$('#au');if($('#manualClock'))$('#manualClock').textContent=formatTime(au.currentTime);
   if($('#manualSeek')&&au.duration)$('#manualSeek').value=String(au.currentTime/au.duration);
 });
+$('
 $('#dt').addEventListener('input',()=>{
   if(!S.buf)return;
-  if(modeValue()==='manual')rebuildManual();
+  if(modeValue()==='manual'){
+    rebuildManual();
+  }else if(S.autoFr){
+    S.autoFr=null;S.fr=null;
+    $('#ex').disabled=true;$('#csv').disabled=true;
+    say('1行あたりの時間を変更しました。自動解析をもう一度実行してください');
+    gi('再生成待ち','時間設定が変わったため自動パターンを無効化しました。',S.name);
+  }
 });
 setManualUI();
 
