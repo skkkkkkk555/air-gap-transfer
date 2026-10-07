@@ -68,13 +68,13 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 .gi-value{display:block;margin-top:2px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .gi-zones{position:relative;padding:0;border:1px solid var(--line);border-radius:16px;background:#111;overflow:hidden}
-.gi-svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.gi-svg{display:block;width:100%;height:auto;touch-action:pan-y;user-select:none}
 .gi-phone{fill:#0c0c0c;stroke:#3c3c3c;stroke-width:2}
 .gi-camera-ring{fill:#151515;stroke:#262626;stroke-width:2}
 .gi-camera{fill:#080808;stroke:#565656;stroke-width:2}
 .gi-camera-lens{fill:#050505;stroke:#444;stroke-width:2}
-.gi-zone{cursor:pointer}
-.gi-zone .gi-hit{fill:none;stroke:transparent;stroke-width:24;stroke-linecap:round;pointer-events:stroke}
+.gi-zone{cursor:default}
+.gi-zone .gi-hit{fill:none;stroke:transparent;stroke-width:24;stroke-linecap:round;pointer-events:none}
 .gi-zone .gi-light{fill:none;stroke:#888;stroke-width:9;stroke-linecap:round;pointer-events:none;opacity:.16;transition:opacity .08s linear,stroke-width .08s linear,filter .08s linear}
 .gi-zone.active .gi-light{stroke:#fff}
 .gi-zone.scanning .gi-light{animation:giScan .55s ease-in-out infinite alternate}
@@ -288,17 +288,31 @@ $('#f').onchange=async e=>{
   const reusableOgg=isOgg&&sourceIsOpus;
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
-  const ctx=new AC();
   progress(2,'音声を読み込み中…',true);
-  S.buf=await ctx.decodeAudioData(original.slice(0));
-  if(ctx.close)try{await ctx.close()}catch(_){}
+  let ctx=null;
+  try{
+    ctx=new AC();
+    const pcm=original.slice(0);
+    S.buf=await new Promise((resolve,reject)=>{
+      let settled=false;
+      const ok=v=>{if(!settled){settled=true;resolve(v)}};
+      const ng=err=>{if(!settled){settled=true;reject(err||new Error('音声デコードに失敗しました'))}};
+      try{
+        const r=ctx.decodeAudioData(pcm,ok,ng);
+        if(r&&typeof r.then==='function')r.then(ok).catch(ng);
+      }catch(err){ng(err)}
+    });
+  }finally{
+    if(ctx&&ctx.close)try{await ctx.close()}catch(_){}
+  }
+  if(!S.buf||!S.buf.length)throw Error('音声データをデコードできませんでした');
   
-S.sourceOgg=reusableOgg;
+  S.sourceOgg=reusableOgg;
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
   S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
   S.fr=null;
 
-  $('#au').src=URL.createObjectURL(f);
+  $('#au').src=URL.createObjectURL(f);$('#au').load();
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(reusableOgg)try{
