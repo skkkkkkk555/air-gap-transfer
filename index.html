@@ -185,9 +185,9 @@ const progress=(pct,text,ind=false)=>{
 const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),1600)};
 
 const GI_GEOM={
-  C:{cx:180,cy:164,r:92,a0:136,a1:220,n:20},
-  A:{cx:180,cy:164,r:92,a0:-28,a1:30,n:11},
-  B:{cx:180,cy:164,r:92,a0:118,a1:148,n:5}
+  C:{cx:180,cy:164,r:92,a0:225,a1:255,n:20},
+  A:{cx:180,cy:164,r:92,a0:-45,a1:60,n:11},
+  B:{cx:180,cy:164,r:92,a0:135,a1:165,n:5}
 };
 const GI_RING=Array.from({length:11},(_,i)=>20+i).concat(Array.from({length:5},(_,i)=>31+i),Array.from({length:20},(_,i)=>i));
 const GI_RING_POS=new Uint8Array(36);GI_RING.forEach((z,p)=>GI_RING_POS[z]=p);
