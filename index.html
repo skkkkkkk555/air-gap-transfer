@@ -416,8 +416,12 @@ $('#f').onchange=async e=>{
   progress(2,'音声を読み込み中…',true);
   S.buf=await ctx.decodeAudioData(original.slice(0));
   if(ctx.close)try{await ctx.close()}catch(_){}
-  S.sourceOgg=reusableOgg;
+  
+S.sourceOgg=reusableOgg;
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
+  S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
+  S.manualEvents=[];S.manualFr=new Uint16Array(S.F*N);S.autoFr=null;S.fr=null;
+
   $('#au').src=URL.createObjectURL(f);
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
@@ -532,78 +536,117 @@ async function gen(){
    return o;
  };
  const energy=smooth(rmsN),motion=smooth(fluxN),D=+$('#dec').value,G=+$('#gain').value,V=+$('#spd').value;
- const tailFrames=Math.max(3,Math.round((.16+D*.9)/dt));
- const raw=new Uint16Array(F*N);
- const trail=new Float32Array(12),beatTrail=new Float32Array(5);
- let seed=0x4d595df4;
- const rnd=()=>{seed|=0;seed=(seed*1664525+1013904223)|0;return(seed>>>0)/4294967296};
- for(let t=0;t<F;t++){
-   const v=new Float32Array(N),e=energy[t],m=motion[t],cv=cent[t];
-   const kick=K[t]||0,sn=Sn[t]||0,hat=Hh[t]||0;
-   // 音量・激しさに応じて演出そのものを切り替える。
-   // calm=環境光 / flow=移動波 / active=ビート波 / high=衝撃・全体発光。
-   const intensity=Math.max(e*.62,m*.78,pulse*.9);
-   const mode=intensity<.18?0:intensity<.42?1:intensity<.70?2:3;
-   const phase=t*(.045+V*.035);
-   for(let i=0;i<20;i++){
-     const u=i/20*12,k=Math.min(11,Math.floor(u)),f=u-k;
-     const spec=bandN[k][t]*(1-f)+bandN[Math.min(11,k+1)][t]*f;
-     const wave=.5+.5*Math.sin(phase*1.8+i*.72);
-     const chase=Math.exp(-Math.pow((((i-t*(.7+V*.5))%20+20)%20)-10,2)/18);
-     const calm=.10+.30*spec+.16*e;
-     const flowing=.12+.38*spec+.18*wave+.16*chase*m;
-     const active=.10+.48*spec+.20*wave+.32*chase*m+.18*kick;
-     const impact=.08+.40*spec+.26*m+.36*chase*Math.max(kick,sn)+.25*pulse;
-     v[i]=[calm,flowing,active,impact][mode];
-   }
-   if(kick>0){
-     const center=(t*(.9+V*.8)+kick*8)%20;
-     for(let i=0;i<20;i++){const d=Math.min(Math.abs(i-center),20-Math.abs(i-center));v[i]+=kick*(mode>=2?.65:.30)*Math.exp(-d*d/(mode===3?5:9))}
-   }
-   if(sn>0){
-     const pos=(t*(1.3+V)+sn*15)%20;
-     for(let i=0;i<20;i++){const d=Math.min(Math.abs(i-pos),20-Math.abs(i-pos));v[i]+=sn*(mode>=2?.72:.34)*Math.exp(-d*d/(mode===3?2.8:5.5))}
-   }
-   if(hat>0){
-     const count=mode===0?1:mode===1?2:mode===2?3:5;
-     for(let n=0;n<count;n++){const z=(Math.floor(t*(1.1+V*.9))+n*7)%20;v[z]+=hat*(.45-.055*n)}
-   }
-   for(let k=0;k<11;k++){
-     const q=.62*bandN[k][t]+.38*bandN[k+1][t],attack=Math.max(0,q-trail[k]);
-     trail[k]=Math.max(q,trail[k]*(.86+mode*.025));
-     v[20+k]=Math.min(1,.06+q*(.48+.10*mode)+trail[k]*(.18+.06*mode)+attack*(.65+.30*mode));
-   }
-   const event=[kick,sn,hat,m,pulse];
-   for(let k=0;k<4;k++){
-     const base=event[k]||0;
-     beatTrail[k]=Math.max(base,beatTrail[k]*(.68+.06*mode));
-     v[31+k]=Math.min(1,.04+beatTrail[k]*(.55+.16*mode)+e*(.12+.08*mode));
-   }
-   v[35]=Math.min(1,.05+e*(.35+.15*mode)+m*(.30+.16*mode)+pulse*(.35+.22*mode));
-   // Slight deterministic variation prevents sterile repetition without adding random jumps.
-   const detail=.96+.08*rnd();
-   const master=(.12+.88*Math.pow(Math.max(e,m*.72,pulse*.65),.62))*(.62+.38*Math.min(1,m*SENS))*G*detail;
-   for(let i=0;i<N;i++){
-     const shaped=Math.pow(Math.max(0,Math.min(1,v[i]*master)),1.22);
-     raw[t*N+i]=Math.max(0,Math.min(4095,Math.round(4095*shaped)));
-   }
-   if(t%48===0||t===F-1){
-     const pct=55+t/Math.max(1,F-1)*45;
-     progress(pct,'36ゾーンの光り方を構築中…');
-     say(`演出を最適化中 ${Math.round((t/Math.max(1,F-1))*100)}%`);
-     await new Promise(r=>setTimeout(r,0));
-   }
- }
- const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);
- for(let t=0;t<F;t++){
-   const s=Math.max(0,Math.min(F-1,t+sh));
-   for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i];
- }
- S.fr=fr;S.F=F;
- const pk=K.reduce((n,x)=>n+(x>.2?1:0),0),ps=Sn.reduce((n,x)=>n+(x>.2?1:0),0),ph=Hh.reduce((n,x)=>n+(x>.2?1:0),0);
- say(`生成しました（${F}行×${N}列）\nキック ${pk} / スネア ${ps} / ハイハット ${ph} を検知\n1024 FFT・適応型ピーク検出・スペクトル追従で生成`);
+ 
+const tailFrames=Math.max(3,Math.round((.16+D*.9)/dt));
+const raw=new Uint16Array(F*N);
+const trail=new Float32Array(12);
+const ringOrder=GI_RING;
+const wrap=(x,n)=>((x%n)+n)%n;
+const gauss=(d,w)=>Math.exp(-(d*d)/Math.max(.25,w));
+const add=(v,k,x)=>{if(k>=0&&k<N)v[k]=Math.min(1,v[k]+x)};
+const phaseSeed=(t,cv)=>t*.17+Math.sin(t*.031+cv*8)*1.7;
+const meanSeries=a=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i];return a.length?s/a.length:0};
+const avgEnergy=meanSeries(energy),avgMotion=meanSeries(motion),avgCent=meanSeries(cent);
+const autoProfile=avgMotion*1.35+avgEnergy*.65+avgCent*.25;
+const blockFrames=Math.max(30,Math.round(6/dt));
+
+for(let t=0;t<F;t++){
+  const v=new Float32Array(N),e=energy[t],m=motion[t],cv=cent[t];
+  const kick=K[t]||0,sn=Sn[t]||0,hat=Hh[t]||0;
+  const pulse=Math.max(kick,sn*.92,hat*.65,m*.55);
+  const intensity=Math.max(.001,Math.min(1,Math.max(e*.76,m*.92,pulse*1.02)));
+  const tier=intensity<.16?0:intensity<.36?1:intensity<.62?2:3;
+  const block=Math.floor(t/blockFrames);
+  const pattern=(block+Math.floor(cv*2.99)+(m>.62?1:0)+Math.floor(autoProfile*1.7))%3;
+  const power=.34+.66*Math.pow(intensity,.58);
+  const speed=.35+V*(.50+.95*intensity)+m*1.35;
+
+  if(pattern===0){
+    const head=wrap(t*speed*.12+phaseSeed(t,cv),36);
+    for(let p=0;p<36;p++){
+      const d=Math.min(Math.abs(p-head),36-Math.abs(p-head));
+      const lead=gauss(d,1.0+tier*1.2),tail=gauss(d-2.4,5.0+tier*2.6),z=ringOrder[p];
+      const group=z<20?1.03:z<31?1.0:.9;
+      add(v,z,(.04+.40*lead+.18*tail+.15*e)*group*power);
+    }
+    if(kick>.10){
+      const shock=wrap(head+kick*9,36);
+      for(let p=0;p<36;p++){const d=Math.min(Math.abs(p-shock),36-Math.abs(p-shock));add(v,ringOrder[p],kick*(tier>=2?.62:.34)*gauss(d,2.1+tier*1.5))}
+    }
+    if(sn>.12)for(let q=0;q<5;q++)add(v,ringOrder[wrap(Math.floor(head)+q*3,36)],sn*(.50-.08*q));
+    if(hat>.18){
+      const count=tier===3?7:tier===2?5:tier===1?3:1;
+      for(let q=0;q<count;q++)add(v,ringOrder[wrap(Math.floor(t*V*1.7)+q*8,36)],hat*(.34-.035*q));
+    }
+  }else if(pattern===1){
+    const focus=wrap(cv*36+t*(.18+V*.24+cv*.22),36);
+    for(let z=0;z<36;z++){
+      let spec=0;
+      if(z<20){
+        const q=z/20*8.8,k=Math.min(10,Math.floor(q)),f=q-k;
+        spec=bandN[k][t]*(1-f)+bandN[Math.min(11,k+1)][t]*f;
+      }else if(z<31){
+        const q=(z-20)/10*11,k=Math.min(10,Math.floor(q)),f=q-k;
+        spec=bandN[k][t]*(1-f)+bandN[Math.min(11,k+1)][t]*f;
+      }else spec=.55*bandN[Math.min(11,8+(z-31))][t]+.45*hat;
+      const p=GI_RING_POS[z],d=Math.min(Math.abs(p-focus),36-Math.abs(p-focus));
+      const bloom=gauss(d,3.7+intensity*6.0),wave=.5+.5*Math.sin(t*(.025+V*.018)+z*.55+cv*7);
+      const attack=Math.max(0,spec-trail[z%12]);
+      trail[z%12]=Math.max(spec,trail[z%12]*(.80+.045*tier));
+      add(v,z,.025+.46*spec+.14*wave+.30*bloom*m+.46*attack*(.65+.20*tier));
+    }
+    if(pulse>.12){
+      const spokes=2+tier;
+      for(let q=0;q<spokes;q++)add(v,ringOrder[wrap(Math.floor(focus)+q*12,36)],pulse*(.34-.035*q));
+    }
+  }else{
+    const flip=(Math.floor(t/Math.max(18,Math.round(.72/dt)))&1)?-1:1;
+    const base=wrap(t*(.28+V*.55+intensity*.6)+cv*19,36);
+    for(let z=0;z<36;z++){
+      const p=GI_RING_POS[z];
+      const p1=wrap(base*flip+p*1.13,36),d1=Math.min(Math.abs(p1-18),36-Math.abs(p1-18));
+      const p2=wrap(-base*.78+p*1.91+10,36),d2=Math.min(Math.abs(p2-18),36-Math.abs(p2-18));
+      const p3=wrap(base*.44-p*1.37+23,36),d3=Math.min(Math.abs(p3-18),36-Math.abs(p3-18));
+      const branch=gauss(d1,1.7+tier*1.3)+.68*gauss(d2,3.1+tier*1.6)+.42*gauss(d3,4.2+tier*1.8);
+      const grain=((p*13+t*7)%31)/31;
+      add(v,z,(.03+.29*branch+.14*grain*m+.21*e)*power);
+    }
+    const sparks=tier===3?8:tier===2?6:tier===1?3:1;
+    for(let q=0;q<sparks;q++){
+      const p=wrap(Math.floor(t*(.72+V*.95))+q*5+Math.floor(cv*21),36);
+      add(v,ringOrder[p],(.34+.11*tier)*(hat*.55+sn*.72+kick*.35));
+      if(tier>=2)add(v,ringOrder[wrap(p+(q&1?2:-2),36)],.14*sn);
+    }
+    if(kick>.20){
+      const shock=wrap(base+kick*12,36);
+      for(let p=0;p<36;p++){const d=Math.min(Math.abs(p-shock),36-Math.abs(p-shock));add(v,ringOrder[p],kick*.46*gauss(d,3.2+tier*1.2))}
+    }
+  }
+
+  const brightness=(.52+.48*intensity)*(.72+.28*Math.min(1,m*SENS))*G*(.95+.05*Math.sin(t*.19));
+  for(let i=0;i<N;i++){
+    let shaped=Math.max(0,Math.min(1,v[i]*brightness));
+    shaped=Math.pow(shaped,tier===0?1.50:tier===1?1.30:tier===2?1.12:1.00);
+    raw[t*N+i]=Math.max(0,Math.min(4095,Math.round(4095*shaped)));
+  }
+  if(t%48===0||t===F-1){
+    const pct=55+t/Math.max(1,F-1)*45;
+    progress(pct,'36ゾーンの光り方を構築中…');
+    say('3パターンを構築中 '+PATTERN_NAMES[pattern]+' / '+Math.round((t/Math.max(1,F-1))*100)+'%');
+    await new Promise(r=>setTimeout(r,0));
+  }
+}
+const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);
+for(let t=0;t<F;t++){
+  const s=Math.max(0,Math.min(F-1,t+sh));
+  for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i];
+}
+S.fr=fr;S.autoFr=fr;S.F=F;
+ 
+const pk=K.reduce((n,x)=>n+(x>.2?1:0),0),ps=Sn.reduce((n,x)=>n+(x>.2?1:0),0),ph=Hh.reduce((n,x)=>n+(x>.2?1:0),0);
+say('生成しました（'+F+'行×'+N+'列）\n3パターン：ORBIT SHOCK / SPECTRUM BLOOM / FRACTAL CHASE\nキック '+pk+' / スネア '+ps+' / ハイハット '+ph+' を検知\n音量・激しさ・周波数で明るさと動きを変化');
  $('#ex').disabled=false;$('#csv').disabled=false;
- gi('解析完了','音の変化を36ゾーンへ立体的に配置しました。',S.name);
+ gi('解析完了','3パターンを音の激しさ・音域に応じて切替しました。Glyphは白発光です。',S.name);
  progressDone('解析完了');
 }
 $('#go').onclick=async()=>{
