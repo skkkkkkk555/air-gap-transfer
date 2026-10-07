@@ -379,28 +379,48 @@ function rewrite(u,meta){
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
+ S.name=f.name.replace(/\.[^.]+$/,'');S.u8=null;S.ogg=false;S.sourceOgg=false;S.converted=false;S.fr=null;S.F=0;S.tpl=null;
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込んでいます…',true);
+
+ // 再生経路は変換処理から完全に分離。旧正常版と同じく、選択した元音源を先にプレーヤーへ渡す。
+ const au=$('#au');
+ if(!au)throw Error('音声プレーヤーが見つかりません');
+ au.onerror=()=>{
+   const er=au.error,code=er?er.code:0;
+   const detail=code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':code===2?'データ取得エラー':code===1?'読み込み中断':'不明なメディアエラー';
+   say('再生失敗: '+detail+' / code='+code+' / readyState='+au.readyState,1);
+ };
+ releaseAudioUrl();
+ currentAudioUrl=URL.createObjectURL(f);
+ currentAudioMode='original';
+ au.src=currentAudioUrl;
+ au.load();
+
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
   const ctx=new AC();
-  progress(2,'音声を読み込み中…',true);
+  progress(2,'音声を解析用に読み込み中…',true);
   S.buf=await ctx.decodeAudioData(original.slice(0));
   if(ctx.close)try{await ctx.close()}catch(_){}
-  let displayFile=f;
-  if(isOgg){S.u8=originalU8;S.ogg=true}
-  else{
-    progress(3,'OGG(Vorbis)へ自動変換を開始…');
+
+  if(isOgg){
+   S.u8=originalU8;S.ogg=true;S.sourceOgg=true;
+  }else{
+   progress(3,'OGG(Vorbis)へ自動変換を開始…');
+   try{
     const ogg=await convertBufferToOgg(S.buf);
     S.u8=ogg;S.ogg=true;S.converted=true;
-    displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
+   }catch(err){
+    S.u8=null;S.ogg=false;S.converted=false;
+    say('再生は可能ですがOGG変換に失敗: '+(err&&err.message||err),1);
+   }
   }
-  $('#au').src=URL.createObjectURL(displayFile);S.fr=null;S.tpl=null;
-  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
-  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
+
+  let msg=S.buf.duration.toFixed(1)+'秒 / 元音源を再生';
+  if(S.converted)msg+='\n内部処理用にOGG(Vorbis)へ自動変換済み';
   if(isOgg)try{
     const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
     const a=c.find(s=>/^AUTHOR=/i.test(s));
@@ -408,20 +428,22 @@ $('#f').onchange=async e=>{
       const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
       const rows=txt.split(/\r?\n/).filter(x=>x.trim());
       const cols=rows[0].split(',').filter(x=>x!=='').length;
-      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
       $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+      msg+='\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\n列数が'+N+'ではありません。3a以外の可能性があります':'');
     }
-    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
+
   gi('準備完了','「点灯データを生成」を押してください。',f.name);
-  $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
-  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
+  $('#info').textContent=msg;
+  $('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
+  say('「点灯データを生成」を押してください');
   progressDone('音源の準備完了');
  }catch(x){
   $('#progressWrap').classList.remove('show');
-  say('読み込めません: '+(x&&x.message||x),1);
-  gi('エラー','音源を読み込めませんでした。',f.name)
+  say('解析用読み込み失敗: '+(x&&x.message||x),1);
+  gi('エラー','解析用に音源を読み込めませんでした。プレーヤーは元音源を保持しています。',f.name)
  }
 };
 /* ---- 解析・演出 ---- */
