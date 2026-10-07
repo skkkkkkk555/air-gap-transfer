@@ -161,7 +161,7 @@ function parseC(p){const td=new TextDecoder(),m=td.decode(p.subarray(0,8)),opus=
 function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[te.encode('OpusTags'),u32(v.length),v,u32(c.length)];for(const s of c){const e=te.encode(s);q.push(u32(e.length),e)}return cat(q)}
 function makePacketPages(packet,serial,seq,flags,granule){
  const out=[],max=255*255;let o=0,first=true;
- while(o<packet.length||first){const end=Math.min(packet.length,o+max),chunk=packet.subarray(o,end),lace=[];for(let i=0;i<chunk.length;i+=255)lace.push(Math.min(255,chunk.length-i));if(packet.length===0)lace.push(0);
+ while(o<packet.length||first){const end=Math.min(packet.length,o+max),chunk=packet.subarray(o,end),lace=[];for(let i=0;i<chunk.length;i+=255)lace.push(Math.min(255,chunk.length-i));if(end===packet.length&&chunk.length%255===0)lace.push(0);
   const h=new Uint8Array(27+lace.length);h.set([79,103,103,83,0,(first?flags:0)|((first?0:1)));h.set(serial,14);const hd=new DataView(h.buffer);hd.setBigUint64(6,BigInt(first?granule:0),true);hd.setUint32(18,seq++,true);h[26]=lace.length;h.set(lace,27);const pg=cat([h,chunk]);const d=new DataView(pg.buffer,pg.byteOffset,pg.byteLength);d.setUint32(22,0,true);d.setUint32(22,crc(pg),true);out.push(pg);o=end;first=false;
  }
  return{pages:out,nextSeq:seq};
@@ -178,7 +178,9 @@ function validateComposition(u){
  const rows=author.split(/\r\n|\n/).filter(x=>x.length);if(!rows.length)throw Error('AUTHORデータが空です');
  for(const row of rows){const v=row.split(',').filter(x=>x!=='');if(v.length!==36)throw Error('AUTHORの列数が36ではありません');for(const x of v){const n=Number(x);if(!Number.isInteger(n)||n<0||n>4095)throw Error('AUTHOR値が0〜4095の範囲外です')}}
  const custom=await inflate(Uint8Array.from(atob(map.get('CUSTOM1').replace(/\s/g,'')),x=>x.charCodeAt(0)));if(custom!==','&&!/^(?:\d+-\d+,)*$/.test(custom))throw Error('CUSTOM1形式が不正です');
- for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength),expected=d.getUint32(22,true);d.setUint32(22,0,true);if(expected!==crc(q))throw Error('OGG CRC検証失敗')}
+ let expectedSeq=0;for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength),expected=d.getUint32(22,true);if(d.getUint32(18,true)!==expectedSeq++)throw Error('OGGページ番号が連続していません');d.setUint32(22,0,true);if(expected!==crc(q))throw Error('OGG CRC検証失敗')}
+ if((new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[0].o+5)&2)===0)throw Error('OGG BOSフラグがありません');
+ if((new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[P.length-1].o+5)&4)===0)throw Error('OGG EOSフラグがありません');
  return{pages:P.length,rows:rows.length,durationPackets:ps.length};
 }
 function rewrite(u,meta){
