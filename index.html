@@ -27,10 +27,31 @@ audio{width:100%;margin-top:8px}
 .stage{display:flex;justify-content:center;position:relative}
 canvas{width:300px;height:329px;max-width:100%}
 #cnt{font:800 20px "Doto",monospace;position:absolute;right:0;top:0;color:var(--ink)}
+
+#glyphInterface{display:block!important;visibility:visible!important;opacity:1!important}
+.gi-title{font:800 16px "Doto",monospace;letter-spacing:.08em;margin:0 0 10px}
+.gi-panel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.gi-box{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.gi-label{display:block;color:var(--mut);font-size:11px;letter-spacing:.08em}
+.gi-value{display:block;margin-top:2px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0}
+.gi-zone.active{background:var(--acc);box-shadow:0 0 8px rgba(215,25,33,.45)}
+.gi-foot{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin-top:7px}
+@media(max-width:380px){.gi-panel{grid-template-columns:1fr}.gi-zones{grid-template-columns:repeat(9,1fr)}}
 </style></head><body>
 <h1>Glyphトーン工房</h1>
 <p class="sub">Phone (3a) の36ゾーン向け。音を解析して点灯データを作り、OGGに埋め込みます。</p>
-<section id="glyphInterface"><h2>Glyph Interface</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="padding:10px;border:1px solid var(--line);border-radius:8px"><small style="color:var(--mut)">INPUT</small><br><b id="uiInput">未選択</b></div><div style="padding:10px;border:1px solid var(--line);border-radius:8px"><small style="color:var(--mut)">STATUS</small><br><b id="uiStatus">待機中</b></div></div><div id="uiHint" class="sub" style="margin:10px 0 0">音源を選択すると解析を開始できます。</div></section>
+<section id="glyphInterface">
+  <div class="gi-title">GLYPH INTERFACE</div>
+  <div class="gi-panel">
+    <div class="gi-box"><span class="gi-label">INPUT</span><span class="gi-value" id="giInput">未選択</span></div>
+    <div class="gi-box"><span class="gi-label">STATUS</span><span class="gi-value" id="giStatus">待機中</span></div>
+  </div>
+  <div class="gi-zones"><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i></div>
+  <div class="gi-foot"><span id="giHint">音源を選択すると解析できます</span><b>36 ZONES</b></div>
+</section>
+
 
 <section><h2>1. 音源</h2>
 <input type="file" id="f" accept=".ogg,.mp3,.wav,.m4a,audio/*">
@@ -43,21 +64,22 @@ canvas{width:300px;height:329px;max-width:100%}
 <label>掃引の速さ <span id="v3">1.0</span><input type="range" id="spd" min="0.4" max="2.5" step="0.1" value="1"></label>
 <label>音の検知感度(右ほど細かい音も拾う) <span id="v4">1.0</span><input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"></label>
 <label>タイミング補正(ミリ秒、+で光を早める) <span id="v5">0</span><input type="range" id="lat" min="-150" max="150" step="5" value="0"></label>
-<button class="main" id="go">開始・点灯データを生成</button>
+<button class="main" id="go" disabled>点灯データを生成</button>
 <div class="stage" style="margin-top:12px"><canvas id="cv" width="620" height="680"></canvas><div id="cnt"></div></div>
 <div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
 
 <section><h2>3. 書き出し</h2>
-<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.666"></label>
-<label>CUSTOM1元データ（空欄なら元データを引き継ぐ）<input type="text" id="c1"></label>
+<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.667"></label>
+<label>CUSTOM1タグ(空欄なら元のOGGの値を引き継ぐ)<input type="text" id="c1"></label>
 <button class="main" id="ex" disabled>OGGを書き出す</button>
 <button id="csv" disabled>CSVを保存</button>
 <div id="st"></div></section>
 
 <script>
 const $=s=>document.querySelector(s),N=36;
-const S={buf:null,u8:null,ogg:false,codec:null,fr:null,F:0,tpl:null,name:'glyph',tags:null,vendor:null};
-const ui=(status,hint,input)=>{if($('#uiStatus'))$('#uiStatus').textContent=status;if($('#uiHint'))$('#uiHint').textContent=hint;if($('#uiInput'))$('#uiInput').textContent=input||'未選択'};
+const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null};
+const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択'};
+const updateGI=()=>{const z=document.querySelectorAll('.gi-zone');const au=$('#au');if(!S.fr||!S.F){z.forEach(x=>x.classList.remove('active'));return}const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(+$('#dt').value/1000))));for(let k=0;k<36;k++)z[k].classList.toggle('active',S.fr[i*36+k]>800);};
 const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
 const cat=a=>{let n=0;a.forEach(x=>n+=x.length);const o=new Uint8Array(n);let p=0;a.forEach(x=>{o.set(x,p);p+=x.length});return o};
 const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)};
@@ -67,26 +89,29 @@ const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new Decom
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
 const crc=b=>{let c=0;for(let i=0;i<b.length;i++)c=((c<<8)^T[((c>>>24)^b[i])&255])>>>0;return c};
-function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103&&u[o+2]==103&&u[o+3]==83){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
-function headers(u,P){const pk=[],td=new TextDecoder();let cur=[],k=0,need=3;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){if(o+s>p.end)throw Error('OGGページが壊れています');cur.push(u.subarray(o,o+s));o+=s;if(s<255){const packet=cat(cur);pk.push(packet);cur=[];if(pk.length===1){const name=td.decode(packet.subarray(0,8));need=name==='OpusHead'?2:3}}}if(pk.length>=need)break}return{pk,last:k}}
-function readU32(u,o){if(o+4>u.length)throw Error('OGGヘッダーが壊れています');return new DataView(u.buffer,u.byteOffset+o,4).getUint32(0,true)}
-function pageSeq(u,p){return readU32(u,p.o+18)}
-function codecFromIdentification(p){const td=new TextDecoder();if(p.length>=8&&td.decode(p.subarray(0,8))==='OpusHead')return'opus';if(p.length>=7&&p[0]===1&&td.decode(p.subarray(1,7))==='vorbis')return'vorbis';return null}
-function parseC(p){const td=new TextDecoder(),s8=td.decode(p.subarray(0,8));let o;if(s8==='OpusTags')o=8;else if(p.length>=7&&p[0]===3&&td.decode(p.subarray(1,7))==='vorbis')o=7;else throw Error('対応していないコメント形式です');const vl=readU32(p,o);o+=4;if(o+vl+4>p.length)throw Error('コメントヘッダーが壊れています');const vendor=p.slice(o,o+vl);o+=vl;const n=readU32(p,o);o+=4;const c=[];for(let i=0;i<n;i++){const l=readU32(p,o);o+=4;if(o+l>p.length)throw Error('コメント長が壊れています');c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
-function buildC(v,c,codec){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[codec==='opus'?te.encode('OpusTags'):new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});if(codec!=='opus')q.push(new Uint8Array([1]));return cat(q)}
-function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{const full=Math.floor(p.length/255);for(let i=0;i<full;i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255),len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]===255?1:0}return{out,seq}}
-async function rewrite(u,author){const P=pages(u),Hh=headers(u,P),pk=Hh.pk;if(pk.length<2)throw Error('OGGのヘッダーを読めません');const codec=codecFromIdentification(pk[0]);if(!codec)throw Error('Vorbis/Opus以外のOGGには対応していません');if(codec!=='opus')throw Error('Phone (3a) のComposer用OGGはOpus形式が必要です。入力をOpus OGGにしてください');const parsed=parseC(pk[1]),vendor=parsed.vendor,c=parsed.c,title=c.find(s=>/^TITLE=/i.test(s)),album=c.find(s=>/^ALBUM=/i.test(s)),old1=c.find(s=>/^CUSTOM1=/i.test(s));const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1|COMPOSER|CUSTOM2|TITLE|ALBUM)=/i.test(s));keep.push('TITLE='+(title?title.slice(6):S.name));keep.push('ALBUM='+(album?album.slice(6):'CUSTOM'));keep.push('AUTHOR='+author);keep.push('COMPOSER=v1-Asteroids Glyph Composer');keep.push('CUSTOM2=36cols');const user=$('#c1').value.trim();let c1='';if(user)c1=user;else if(old1){try{c1=await inflate(Uint8Array.from(atob(old1.slice(8)),ch=>ch.charCodeAt(0)))}catch(_){c1=''}}keep.push('CUSTOM1='+b64(await deflate(c1)));const serial=u.subarray(P[0].o+14,P[0].o+18),seq0=pageSeq(u,P[1]);const np=paginate([buildC(vendor,keep,codec)],serial,seq0);const parts=[u.slice(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=Hh.last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end),dv=new DataView(pg.buffer,pg.byteOffset,pg.byteLength);dv.setUint32(18,seq++,true);dv.setUint32(22,0,true);dv.setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
+function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
+function headers(u,P){const pk=[];let cur=[],k=0;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){cur.push(u.subarray(o,o+s));o+=s;if(s<255){pk.push(cat(cur));cur=[]}}if(pk.length>=3)break}return{pk,last:k}}
+function parseC(p){const d=new DataView(p.buffer,p.byteOffset,p.byteLength),td=new TextDecoder();let o=7;const vl=d.getUint32(o,true);o+=4;const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
+function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});q.push(new Uint8Array([1]));return cat(q)}
+function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{for(let i=0;i<Math.floor(p.length/255);i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255);li+=seg.length;const len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]==255?1:0}return{out,seq}}
+function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<3)throw Error('OGGの構造を読めません');if(String.fromCharCode(...pk[0].subarray(1,7))!=='vorbis')throw Error('Vorbis形式のOGGのみ対応です(Opusは不可)');const{vendor,c}=parseC(pk[1]);const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1)=/i.test(s));const old1=c.find(s=>/^CUSTOM1=/i.test(s));const v1=$('#c1').value.trim();keep.push('AUTHOR='+author);if(v1)keep.push('CUSTOM1='+v1);else if(old1)keep.push(old1);const serial=u.subarray(P[0].o+14,P[0].o+18);const np=paginate([buildC(vendor,keep),pk[2]],serial,1);const parts=[u.subarray(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end);new DataView(pg.buffer).setUint32(18,seq++,true);new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
+
 /* ---- 読み込み ---- */
-$('#f').onchange=async function(e){
-var f=e.target.files&&e.target.files[0];if(!f)return;
-S.name=f.name.replace(/\.[^.]+$/,'')||'glyph';S.fr=null;S.F=0;S.u8=null;S.ogg=false;S.codec=null;
-$('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;ui('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
-try{var ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=S.u8.length>=4&&String.fromCharCode(S.u8[0],S.u8[1],S.u8[2],S.u8[3])==='OggS';S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);$('#info').textContent=S.buf.duration.toFixed(1)+'秒 / '+(S.ogg?'OGG':'音声ファイル');$('#go').disabled=false;$('#csv').disabled=false;ui('準備完了','開始ボタンを押して36ゾーンを生成できます。',f.name);say('「開始・点灯データを生成」を押してください')}catch(err){S.buf=null;ui('読み込みエラー',err.message,f.name);say('読み込めません: '+err.message,1);$('#go').disabled=false}};
+$('#f').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.name=f.name.replace(/\.[^.]+$/,'');gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
+ try{const ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=String.fromCharCode(...S.u8.subarray(0,4))==='OggS';
+ S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);S.fr=null;S.tpl=null;
+ let msg=\`\u0024{S.buf.duration.toFixed(1)}秒 / \u0024{S.ogg?'OGG':'OGG以外(プレビューとCSVのみ可)'}\`;
+ if(S.ogg){try{const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);const a=c.find(s=>/^AUTHOR=/i.test(s));if(a){const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
+\$('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);msg+=\`\n既存の点灯データを検出: \u0024{rows.length}行×\u0024{cols}列 → 1行=\u0024{\$('#dt').value}ミリ秒に合わせました\`+(cols!==N?\`\n列数が\u0024{N}ではありません。3a以外の可能性があります\`:'')}
+  const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)'}catch(_){}}
+ gi('準備完了','「点灯データを生成」を押してください。',f.name);$('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;say('「点灯データを生成」を押してください')}catch(x){say('読み込めません: '+x.message,1)}};
 ['gain','dec','spd','sens','lat'].forEach((id,i)=>$('#'+id).oninput=e=>$('#v'+(i+1)).textContent=(+e.target.value).toFixed(id=='dec'?2:id=='lat'?0:1));
 
 /* ---- 解析・演出 ---- */
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}async function gen(){
- const b=S.buf;if(!b)throw Error('音源を選択してください');const sr=b.sampleRate,dtm=+$('#dt').value;if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間は0より大きい数値にしてください');if(Math.abs(dtm-16.666)>0.02)throw Error('Phone (3a) Composer互換のため1行=16.666msにしてください');const dt=dtm/1000,hop=sr*dt,F=Math.floor(b.length/hop),W=1024,H=W/2;if(F<1)throw Error('音源が短すぎます');
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
+function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
+async function gen(){
+ const b=S.buf,sr=b.sampleRate,dtm=+$('#dt').value,dt=dtm/1000,hop=sr*dt,F=Math.floor(b.length/hop),W=1024,H=W/2;
  const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
  const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
  const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
@@ -97,7 +122,7 @@ function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%300==0){say(`解析中 ${Math.round(t/F*100)}%`);await new Promise(r=>setTimeout(r))}}
+  if(t%300==0){say(\`解析中 \u0024{Math.round(t/F*100)}%\`);await new Promise(r=>setTimeout(r))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
@@ -119,27 +144,25 @@ function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j
   for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
   const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
-$('#go').onclick=async()=>{if(!S.buf){ui('待機中','先に音源ファイルを選択してください。');say('先に音源ファイルを選択してください',1);$('#f').focus();return}$('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;ui('解析中','波形・スペクトル・36ゾーンを計算しています。',''+S.name);say('解析を開始…');try{await gen();ui('生成完了',`36ゾーンの点灯データを生成しました（${S.F}行）。`,S.name);$('#ex').disabled=!S.ogg||S.codec!=='opus';$('#csv').disabled=false}catch(e){ui('生成エラー',e.message,S.name);say('生成に失敗: '+e.message,1)}finally{$('#go').disabled=false}};
+ S.fr=fr;S.F=F;say(\`生成しました(\u0024{F}行×\u0024{N}列)\nキック\u0024{K.filter(Boolean).length}回 / スネア\u0024{Sn.filter(Boolean).length}回 / ハイハット\u0024{Hh.filter(Boolean).length}回を検知\`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
+$('#go').onclick=()=>{$('#go').disabled=true;gen().catch(e=>say('生成に失敗: '+e.message,1)).finally(()=>$('#go').disabled=false)};
 
 /* ---- 書き出し ---- */
-function csvText(){const rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+',');return rows.join('\r\n')+'\r\n'}
+function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
 const dl=(u,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u]));a.download=n;a.click()};
-$('#ex').onclick=async()=>{try{if(!S.ogg)throw Error('OGG入力が必要です');if(S.codec!=='opus')throw Error('Phone (3a) のComposer用OGGはOpus形式が必要です。Opus OGGを入力してください');const z=await deflate(csvText());ui('書き出し中','Composer用OGGへ点灯データを書き込んでいます。',S.name);const out=await rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。3a用Composer形式のOGGを生成しました');ui('書き出し完了','生成したOGGをComposerへ取り込めます。',S.name)}catch(e){say(e.message,1);ui('書き出しエラー',e.message,S.name)}};
+$('#ex').onclick=async()=>{try{const z=await deflate(csvText());const out=rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。公式Composerのライブラリから取り込んでください')}catch(e){say(e.message,1)}};
 $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 
 /* ---- プレビュー ---- */
 const cv=$('#cv'),cx=cv.getContext('2d'),CX=160,CY=150,R=133;
-if(!cx) throw new Error('Canvasを初期化できません');
-const rr=(ctx,x,y,w,h,r)=>{if(typeof ctx.roundRect==='function'){ctx.roundRect(x,y,w,h,r)}else{ctx.rect(x,y,w,h)}};
 const ARC=[[163,120,20],[14,-30,11],[229,211,5]],Z=[];
 ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
 function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTime/(+$('#dt').value/1000))):-1,rd=d=>-d*Math.PI/180;
  cx.setTransform(2,0,0,2,0,0);cx.clearRect(0,0,310,340);cx.shadowBlur=0;
- cx.beginPath();rr(cx,2,3,306,326,44);cx.fillStyle='#1a1a1a';cx.fill();
+ cx.beginPath();cx.roundRect(2,3,306,420,44);cx.fillStyle='#1a1a1a';cx.fill();
  cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
  cx.lineCap='round';cx.lineWidth=8;
- for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=`rgba(255,255,255,${.1+.9*v})`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
+ for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=\`rgba(255,255,255,\u0024{.1+.9*v})\`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
  cx.shadowBlur=0;$('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';requestAnimationFrame(draw)}
-ui('待機中','音源を選択すると解析を開始できます。');draw();
+gi('待機中','音源を選択すると解析できます');draw();setInterval(updateGI,80);
 </script></body></html>
