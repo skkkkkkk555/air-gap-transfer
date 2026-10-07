@@ -121,7 +121,7 @@ canvas{width:300px;height:329px;max-width:100%}
 
 <script>
 const $=s=>document.querySelector(s),N=36;
-const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null,converted:false};
+const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null,converted:false,sourceOgg:false};
 const progress=(pct,text,ind=false)=>{
   const w=$('#progressWrap'),b=$('#progressBar');
   w.classList.add('show');$('#progressText').textContent=text;$('#progressPct').textContent=ind?'':Math.round(pct)+'%';
@@ -154,7 +154,7 @@ async function convertBufferToOgg(audioBuffer){
     const data=[];
     for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
     encoder.encode(data);
-    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ高速変換中…');
+    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
     await new Promise(r=>setTimeout(r,0));
   }
   const blob=encoder.finish('audio/ogg');
@@ -175,7 +175,7 @@ function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;
+ S.name=f.name.replace(/\.[^.]+$/,'');S.u8=null;S.ogg=false;S.sourceOgg=false;S.converted=false;S.fr=null;S.F=0;S.tpl=null;
  gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
@@ -186,33 +186,27 @@ $('#f').onchange=async e=>{
   progress(2,'音声を読み込み中…',true);
   S.buf=await ctx.decodeAudioData(original.slice(0));
   if(ctx.close)try{await ctx.close()}catch(_){}
-  let displayFile=f;
-  if(isOgg){S.u8=originalU8;S.ogg=true}
-  else{
-    progress(3,'OGG(Vorbis)へ自動変換を開始…');
-    const ogg=await convertBufferToOgg(S.buf);
-    S.u8=ogg;S.ogg=true;S.converted=true;
-    displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
-  }
-  $('#au').src=URL.createObjectURL(displayFile);S.fr=null;S.tpl=null;
-  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
-  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
+  S.sourceOgg=isOgg;
+  if(isOgg)S.u8=originalU8,S.ogg=true;
+  $('#au').src=URL.createObjectURL(f);
+  let msg=S.buf.duration.toFixed(1)+'秒 / '+(isOgg?'OGG(Vorbis)':'元音源');
+  if(!isOgg)msg+='\\nOGG(Vorbis)変換は「OGGを書き出す」時だけ実行します';
   if(isOgg)try{
-    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
-    const a=c.find(s=>/^AUTHOR=/i.test(s));
-    if(a){
-      const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
-      const rows=txt.split(/\r?\n/).filter(x=>x.trim());
-      const cols=rows[0].split(',').filter(x=>x!=='').length;
-      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
-      $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
-    }
-    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+   const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
+   const a=c.find(s=>/^AUTHOR=/i.test(s));
+   if(a){
+    const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
+    const rows=txt.split(/\r?\n/).filter(x=>x.trim());
+    const cols=rows[0].split(',').filter(x=>x!=='').length;
+    S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+    $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
+    msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+   }
+   const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
   gi('準備完了','「点灯データを生成」を押してください。',f.name);
   $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
-  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
+  say('「点灯データを生成」を押してください');
   progressDone('音源の準備完了');
  }catch(x){
   $('#progressWrap').classList.remove('show');
@@ -299,7 +293,7 @@ async function gen(){
   for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
 }
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false;progressDone('解析完了')}
+ S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
 $('#go').onclick=async()=>{
   $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);
   progress(0,'解析を準備中…');
@@ -309,7 +303,29 @@ $('#go').onclick=async()=>{
 /* ---- 書き出し ---- */
 function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
 const dl=(u,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u]));a.download=n;a.click()};
-$('#ex').onclick=async()=>{try{const z=await deflate(csvText());const out=rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。公式Composerのライブラリから取り込んでください')}catch(e){say(e.message,1)}};
+$('#ex').onclick=async()=>{
+ try{
+  $('#ex').disabled=true;
+  if(!S.buf)throw Error('先に音源を選択してください');
+  if(!S.ogg){
+   gi('OGG変換中…','書き出し用のVorbis OGGを作成しています。',S.name);
+   say('書き出し用OGGを変換中…');
+   progress(0,'OGG(Vorbis)へ変換中…');
+   S.u8=await convertBufferToOgg(S.buf);
+   S.ogg=true;S.converted=true;
+  }
+  progress(92,'点灯データを書き込み中…');
+  const z=await deflate(csvText()),out=rewrite(S.u8,b64(z));
+  dl(out,S.name+'_glyph.ogg');
+  gi('書き出し完了','公式Composerのライブラリから取り込んでください。',S.name);
+  say('書き出しました。公式Composerのライブラリから取り込んでください');
+  progressDone('OGG書き出し完了');
+ }catch(e){
+  say(e&&e.message||e,1);
+  gi('エラー','OGG書き出しに失敗しました。',S.name);
+  $('#progressWrap').classList.remove('show');
+ }finally{$('#ex').disabled=false}
+};
 $('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
 
 /* ---- プレビュー ---- */
