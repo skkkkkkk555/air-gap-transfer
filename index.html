@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-version" content="1da0b064-vorbis2-wasm">
+<meta name="app-version" content="1da0b064-composer36-opus-v3">
 
 <script>
 /* Force the browser to abandon obsolete cached documents. */
@@ -25,8 +25,9 @@ if(location.search.includes('swclean=1')){
 })();
 </script>
 
-<!-- Lightweight WebAssembly Ogg/Vorbis encoder -->
-<script src="https://unpkg.com/wasm-media-encoders/dist/umd/WasmMediaEncoder.min.js"></script>
+<!-- Nothing Glyph Composer compatible Ogg/Opus encoder -->
+<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/OpusMediaRecorder.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/encoderWorker.umd.js"></script>
 
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -110,7 +111,7 @@ canvas{width:300px;height:329px;max-width:100%}
 <div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
 
 <section><h2>3. 書き出し</h2>
-<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.667"></label>
+<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.666"></label>
 <label>CUSTOM1タグ(空欄なら元のOGGの値を引き継ぐ)<input type="text" id="c1"></label>
 <button class="main" id="ex" disabled>OGGを書き出す</button>
 <button id="csv" disabled>CSVを保存</button>
@@ -135,45 +136,63 @@ const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new Decom
 
 /* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
 let _oggEncoderPromise=null;
-async function ensureOggEncoder(){
-  if(!window.WasmMediaEncoder||typeof WasmMediaEncoder.createOggEncoder!=='function')
-    throw Error('高速OGG変換エンジンを読み込めません');
-  if(!_oggEncoderPromise)_oggEncoderPromise=WasmMediaEncoder.createOggEncoder();
-  return await _oggEncoderPromise;
-}
-async function convertBufferToOgg(audioBuffer){
-  const encoder=await ensureOggEncoder();
-  const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
-  const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
-  encoder.configure({sampleRate,channels,vbrQuality:1});
-  progress(2,'OGG(Vorbis)高速変換を開始…');
-  await new Promise(r=>setTimeout(r,0));
-  const chunks=[],chunkSize=Math.max(32768,Math.floor(sampleRate*2));
-  for(let pos=0;pos<total;pos+=chunkSize){
-    const end=Math.min(total,pos+chunkSize),data=[];
-    for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
-    const part=encoder.encode(data);
-    if(part&&part.length)chunks.push(new Uint8Array(part));
-    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)高速変換中…');
-    await new Promise(r=>setTimeout(r,0));
-  }
-  const tail=encoder.finalize();
-  if(tail&&tail.length)chunks.push(new Uint8Array(tail));
-  const out=cat(chunks);
-  if(out.length<64)throw Error('OGG変換結果が空です');
-  progressDone('高速OGG変換完了');
-  return out;
+async async function convertBufferToOgg(audioBuffer){
+ if(!window.OpusMediaRecorder)throw Error('Ogg/Opus変換エンジンを読み込めません');
+ const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('Web Audio APIが必要です');
+ const targetRate=48000,channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
+ const ctx=new AC({sampleRate:targetRate}),frames=Math.ceil(audioBuffer.duration*targetRate),buf=ctx.createBuffer(channels,frames,targetRate);
+ for(let ch=0;ch<channels;ch++){const out=buf.getChannelData(ch),src=audioBuffer.getChannelData(Math.min(ch,audioBuffer.numberOfChannels-1)),scale=(src.length-1)/Math.max(1,frames-1);for(let i=0;i<frames;i++){const p=i*scale,a=Math.floor(p),f=p-a;out[i]=(src[a]||0)*(1-f)+(src[Math.min(a+1,src.length-1)]||0)*f}}
+ const dest=ctx.createMediaStreamDestination(),node=ctx.createBufferSource();node.buffer=buf;node.connect(dest);
+ const workerOptions={OggOpusEncoderWasmPath:'https://cdn.jsdelivr.net/npm/opus-media-recorder@0.8.0/OggOpusEncoder.wasm'};
+ progress(2,'Composer互換のOgg Opusへ変換中…');
+ const rec=new OpusMediaRecorder(dest.stream,{mimeType:'audio/ogg'},workerOptions),chunks=[];
+ return await new Promise((resolve,reject)=>{
+  let done=false;const fail=x=>{if(done)return;done=true;try{ctx.close()}catch(_){}reject(x instanceof Error?x:Error(String(x)))};
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};rec.onerror=fail;
+  rec.onstop=async()=>{if(done)return;done=true;try{const blob=new Blob(chunks,{type:'audio/ogg'});if(blob.size<64)throw Error('Ogg Opus変換結果が空です');const out=new Uint8Array(await blob.arrayBuffer());try{await ctx.close()}catch(_){}resolve(out)}catch(x){fail(x)}};
+  try{rec.start();node.onended=()=>rec.stop();node.start()}catch(x){fail(x)}
+ });
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
 const crc=b=>{let c=0;for(let i=0;i<b.length;i++)c=((c<<8)^T[((c>>>24)^b[i])&255])>>>0;return c};
-function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
-function headers(u,P){const pk=[];let cur=[],k=0;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){cur.push(u.subarray(o,o+s));o+=s;if(s<255){pk.push(cat(cur));cur=[]}}if(pk.length>=3)break}return{pk,last:k}}
-function parseC(p){const d=new DataView(p.buffer,p.byteOffset,p.byteLength),td=new TextDecoder();let o=7;const vl=d.getUint32(o,true);o+=4;const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
-function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});q.push(new Uint8Array([1]));return cat(q)}
-function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{for(let i=0;i<Math.floor(p.length/255);i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255);li+=seg.length;const len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]==255?1:0}return{out,seq}}
-function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<3)throw Error('OGGの構造を読めません');if(String.fromCharCode(...pk[0].subarray(1,7))!=='vorbis')throw Error('Vorbis形式のOGGのみ対応です(Opusは不可)');const{vendor,c}=parseC(pk[1]);const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1)=/i.test(s));const old1=c.find(s=>/^CUSTOM1=/i.test(s));const v1=$('#c1').value.trim();keep.push('AUTHOR='+author);if(v1)keep.push('CUSTOM1='+v1);else if(old1)keep.push(old1);const serial=u.subarray(P[0].o+14,P[0].o+18);const np=paginate([buildC(vendor,keep),pk[2]],serial,1);const parts=[u.subarray(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end);new DataView(pg.buffer).setUint32(18,seq++,true);new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
-
+function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]===79&&u[o+1]===103&&u[o+2]===103&&u[o+3]===83){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n)),end=o+27+n+seg.reduce((x,y)=>x+y,0);if(end>u.length)break;p.push({o,hdr:27+n,seg,end});o=end}return p}
+function packets(u,P){const out=[];let cur=[],start=0;for(let k=0;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const n of p.seg){if(cur.length===0)start=k;cur.push(u.subarray(o,o+n));o+=n;if(n<255){out.push({data:cat(cur),startPage:start,endPage:k});cur=[]}}}return out}
+function parseC(p){const td=new TextDecoder(),m=td.decode(p.subarray(0,8)),opus=m==='OpusTags',vorbis=td.decode(p.subarray(0,7))==='\u0003vorbis';if(!opus&&!vorbis)throw Error('OGGコメントヘッダーが不正です');const d=new DataView(p.buffer,p.byteOffset,p.byteLength);let o=opus?8:7;const vl=d.getUint32(o,true);o+=4;if(o+vl>p.length)throw Error('OGGベンダー情報が不正です');const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;if(o+l>p.length)throw Error('OGGコメントが不正です');c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c,opus}}
+function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[te.encode('OpusTags'),u32(v.length),v,u32(c.length)];for(const s of c){const e=te.encode(s);q.push(u32(e.length),e)}return cat(q)}
+function makePacketPages(packet,serial,seq,flags,granule){
+ const out=[],max=255*255;let o=0,first=true;
+ while(o<packet.length||first){const end=Math.min(packet.length,o+max),chunk=packet.subarray(o,end),lace=[];for(let i=0;i<chunk.length;i+=255)lace.push(Math.min(255,chunk.length-i));if(packet.length===0)lace.push(0);
+  const h=new Uint8Array(27+lace.length);h.set([79,103,103,83,0,(first?flags:0)|((first?0:1)));h.set(serial,14);const d=new DataView(h.buffer);d.setBigUint64(6,BigInt(first?granule:0),true);d.setUint32(18,seq++,true);h[26]=lace.length;h.set(lace,27);let pg=cat([h,chunk]);d.setUint32(22,0,true);d.setUint32(22,crc(pg),true);out.push(pg);o=end;first=false;
+ }
+ return{pages:out,nextSeq:seq};
+}
+function validateComposition(u){
+ const P=pages(u),ps=packets(u,P);if(P.length<3||ps.length<3)throw Error('OGGページ/音声パケット数が不足しています');
+ const td=new TextDecoder(),head=td.decode(ps[0].data.subarray(0,8));if(head!=='OpusHead')throw Error('音声コーデックがOpusではありません');
+ if(td.decode(ps[1].data.subarray(0,8))!=='OpusTags')throw Error('OpusTagsがありません');
+ const parsed=parseC(ps[1].data),map=new Map();for(const x of parsed.c){const k=x.indexOf('=');if(k>0)map.set(x.slice(0,k).toUpperCase(),x.slice(k+1))}
+ for(const k of ['TITLE','ALBUM','AUTHOR','COMPOSER','CUSTOM1','CUSTOM2'])if(!map.has(k))throw Error('必須タグ不足: '+k);
+ if(map.get('COMPOSER')!=='v1-Asteroids Glyph Composer')throw Error('COMPOSERが3a用ではありません');
+ if(map.get('CUSTOM2')!=='36cols')throw Error('CUSTOM2が36colsではありません');
+ const author=await inflate(Uint8Array.from(atob(map.get('AUTHOR').replace(/\s/g,'')),x=>x.charCodeAt(0)));
+ const rows=author.split(/\r\n|\n/).filter(x=>x.length);if(!rows.length)throw Error('AUTHORデータが空です');
+ for(const row of rows){const v=row.split(',').filter(x=>x!=='');if(v.length!==36)throw Error('AUTHORの列数が36ではありません');for(const x of v){const n=Number(x);if(!Number.isInteger(n)||n<0||n>4095)throw Error('AUTHOR値が0〜4095の範囲外です')}}
+ const custom=await inflate(Uint8Array.from(atob(map.get('CUSTOM1').replace(/\s/g,'')),x=>x.charCodeAt(0)));if(custom!==','&&!/^(?:\d+-\d+,)*$/.test(custom))throw Error('CUSTOM1形式が不正です');
+ for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength);d.setUint32(22,0,true);if(d.getUint32(22,true)!==crc(q))throw Error('OGG CRC検証失敗')}
+ return{pages:P.length,rows:rows.length,durationPackets:ps.length};
+}
+function rewrite(u,meta){
+ const P=pages(u),ps=packets(u,P);if(ps.length<3)throw Error('OGGの構造を読めません');
+ const td=new TextDecoder();if(td.decode(ps[0].data.subarray(0,8))!=='OpusHead')throw Error('Composer互換化にはOgg Opus音源が必要です');
+ if(ps[2].startPage!==2)throw Error('特殊なOGGヘッダー配置のため安全に書き換えできません');
+ const parsed=parseC(ps[1].data),keep=parsed.c.filter(s=>!/^(TITLE|ALBUM|AUTHOR|COMPOSER|CUSTOM1|CUSTOM2)=/i.test(s));
+ for(const s of ['TITLE='+meta.title,'ALBUM='+meta.album,'AUTHOR='+meta.author,'COMPOSER='+meta.composer,'CUSTOM1='+meta.custom1,'CUSTOM2='+meta.custom2])keep.push(s);
+ const serial=u.subarray(P[0].o+14,P[0].o+18),first=makePacketPages(ps[0].data,serial,0,2,0),tags=makePacketPages(buildC(parsed.vendor,keep),serial,first.nextSeq,0,0);
+ const parts=[...first.pages,...tags.pages],start=ps[2].startPage;let seq=tags.nextSeq;
+ for(let k=start;k<P.length;k++){const q=u.slice(P[k].o,P[k].end),d=new DataView(q.buffer,q.byteOffset,q.byteLength);d.setUint32(18,seq++,true);d.setUint32(22,0,true);d.setUint32(22,crc(q),true);parts.push(q)}
+ return cat(parts);
+}
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
@@ -182,16 +201,19 @@ $('#f').onchange=async e=>{
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
+  let sourceIsOpus=false;
+  if(isOgg){try{const pp=pages(originalU8),qq=packets(originalU8,pp);sourceIsOpus=new TextDecoder().decode(qq[0].data.subarray(0,8))==='OpusHead'}catch(_){}}
+  const reusableOgg=isOgg&&sourceIsOpus;
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
   const ctx=new AC();
   progress(2,'音声を読み込み中…',true);
   S.buf=await ctx.decodeAudioData(original.slice(0));
   if(ctx.close)try{await ctx.close()}catch(_){}
-  S.sourceOgg=isOgg;
-  if(isOgg)S.u8=originalU8,S.ogg=true;
+  S.sourceOgg=reusableOgg;
+  if(reusableOgg)S.u8=originalU8,S.ogg=true;
   $('#au').src=URL.createObjectURL(f);
-  let msg=S.buf.duration.toFixed(1)+'秒 / '+(isOgg?'OGG(Vorbis)':'元音源');
+  let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!isOgg)msg+='\\nOGG(Vorbis)変換は「OGGを書き出す」時だけ実行します';
   if(isOgg)try{
    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
@@ -221,7 +243,7 @@ function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j
 async function gen(){
  if(!S.buf)throw Error('先に音源を選択してください');
  const dtm=+$('#dt').value;if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間が正しくありません');
- const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.floor(b.length/hop)),W=512,H=W/2;
+ const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.ceil(b.length/hop)),W=512,H=W/2;
  const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
  const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
  const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
@@ -295,7 +317,7 @@ async function gen(){
   for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
 }
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
+ S.fr=fr;S.F=F;`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
 $('#go').onclick=async()=>{
   $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);
   progress(0,'解析を準備中…');
@@ -312,12 +334,13 @@ $('#ex').onclick=async()=>{
   if(!S.ogg){
    gi('OGG変換中…','書き出し用のVorbis OGGを作成しています。',S.name);
    say('書き出し用OGGを変換中…');
-   progress(0,'OGG(Vorbis)へ変換中…');
+   progress(0,'Composer互換Ogg Opusへ変換中…');
    S.u8=await convertBufferToOgg(S.buf);
    S.ogg=true;S.converted=true;
   }
   progress(92,'点灯データを書き込み中…');
-  const z=await deflate(csvText()),out=rewrite(S.u8,b64(z));
+  const z=await deflate(csvText()),c1=await deflate(',');
+  const out=rewrite(S.u8,{title:S.name,album:'Glyph Tools v2',author:b64(z),composer:'v1-Asteroids Glyph Composer',custom1:b64(c1),custom2:'36cols'});
   dl(out,S.name+'_glyph.ogg');
   gi('書き出し完了','公式Composerのライブラリから取り込んでください。',S.name);
   say('書き出しました。公式Composerのライブラリから取り込んでください');
