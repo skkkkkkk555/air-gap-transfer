@@ -324,7 +324,7 @@ async function gen(){
   for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1.25,v[i]*g)),1.55));
 }
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
+ S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;progressDone('解析完了')}
 $('#go').onclick=async()=>{
   $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);
   progress(0,'解析を準備中…');
