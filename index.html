@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="app-version" content="1da0b064-composer36-opus-v3">
+<meta name="app-version" content="glyph36-v4-spectrum-patterns">
 
 <script>
 /* Force the browser to abandon obsolete cached documents. */
@@ -32,10 +32,10 @@ if(location.search.includes('swclean=1')){
 :root[data-theme="dark"]{--bg:#141414;--card:#1f1f1e;--ink:#ecece8;--mut:#9a9992;--line:#383733}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.6 "Zen Kaku Gothic New",system-ui,sans-serif;padding:16px;max-width:560px;margin-inline:auto}
+body{margin:0;background:radial-gradient(circle at 50% -10%,color-mix(in srgb,var(--acc) 7%,var(--bg)),var(--bg) 34%);color:var(--ink);font:400 15px/1.6 "Zen Kaku Gothic New",system-ui,sans-serif;padding:16px;max-width:600px;margin-inline:auto}
 h1{font-size:22px;margin:4px 0 2px}
 .sub{color:var(--mut);margin:0 0 16px;font-size:13px}
-section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+section{background:linear-gradient(145deg,var(--card),color-mix(in srgb,var(--card) 78%,var(--bg)));border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:13px;box-shadow:0 8px 26px rgba(0,0,0,.06)}
 h2{font-size:14px;margin:0 0 8px}
 label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
 input[type=range]{width:100%;accent-color:var(--acc)}
@@ -57,7 +57,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-of
 #st.err{color:var(--acc)}
 audio{width:100%;margin-top:8px}
 .stage{display:flex;justify-content:center;position:relative}
-canvas{width:300px;height:329px;max-width:100%}
+canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rgba(0,0,0,.16))}
 #cnt{font:800 20px "Doto",monospace;position:absolute;right:0;top:0;color:var(--ink)}
 
 #glyphInterface{display:block!important;visibility:visible!important;opacity:1!important}
@@ -66,9 +66,9 @@ canvas{width:300px;height:329px;max-width:100%}
 .gi-box{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .gi-label{display:block;color:var(--mut);font-size:11px;letter-spacing:.08em}
 .gi-value{display:block;margin-top:2px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
-.gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0}
-.gi-zone.active{background:var(--acc);box-shadow:0 0 8px rgba(215,25,33,.45)}
+.gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;padding:10px;border:1px solid var(--line);border-radius:12px;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--acc) 8%,var(--bg)),var(--bg) 64%)}
+.gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0;transition:transform .12s ease,opacity .12s ease,box-shadow .12s ease}.gi-zone.active{transform:scale(1.14)}
+.gi-zone.active{background:radial-gradient(circle at 35% 30%,#fff,var(--acc) 42%,#8b0910 100%);box-shadow:0 0 7px rgba(215,25,33,.35),0 0 18px rgba(215,25,33,.22)}
 .gi-zone.scanning{animation:giScan .55s ease-in-out infinite alternate}
 @keyframes giScan{from{transform:scale(.72);opacity:.35}to{transform:scale(1.08);opacity:1}}
 .gi-foot{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin-top:7px}
@@ -237,7 +237,7 @@ $('#f').onchange=async e=>{
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(reusableOgg)try{
-   const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
+   const P=pages(S.u8),pk=packets(S.u8,P);const{c}=parseC(pk[1].data);
    const a=c.find(s=>/^AUTHOR=/i.test(s));
    if(a){
     const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
@@ -263,82 +263,174 @@ $('#f').onchange=async e=>{
 function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
 async function gen(){
  if(!S.buf)throw Error('先に音源を選択してください');
- const dtm=+$('#dt').value;if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間が正しくありません');
- const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.ceil(b.length/hop)),W=512,H=W/2;
- const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
- const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
- const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
- const win=Float32Array.from({length:W},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/W)),re=new Float32Array(W),im=new Float32Array(W),p1=new Float32Array(H),p2=new Float32Array(H),lm=new Float32Array(H);
- const Bd=[...Array(11)].map(()=>new Float32Array(F)),L=new Float32Array(F),fl=[new Float32Array(F),new Float32Array(F),new Float32Array(F)];
- const fx=R=>{let s=0,n=0;for(const[a,c]of R)for(let i=a;i<c;i++){s+=Math.max(0,lm[i]-Math.max(p1[i],p2[i]));n++}return s/n};
- for(let t=0;t<F;t++){const s0=Math.floor(t*hop-W/2);let e=0;for(let i=0;i<W;i++){const v=x[s0+i]||0;re[i]=v*win[i];im[i]=0;e+=v*v}fft(re,im);L[t]=Math.sqrt(e/W);
-  for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
-  for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
-  fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%32==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'高速解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
- const bl=Math.max(1,Math.round(.5/dt));
- const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
-  const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
-  for(let t=0;t<n;t++){const p=t/bl-.5,j=Math.floor(p),f=p-j,m0=sc[Math.max(0,Math.min(nb-1,j))],m1=sc[Math.max(0,Math.min(nb-1,j+1))],m=Math.max(m0+(m1-m0)*f,lo+(gm-lo)*.35);o[t]=Math.max(0,Math.min(1.1,(col[t]-lo)/(m-lo+1e-6)))}return o};
- const sens=Math.max(.75,+$('#sens').value),pick=f=>{const n=f.length,P=new Float32Array(n+1);for(let i=0;i<n;i++)P[i+1]=P[i]+f[i];const g=Float32Array.from(f).sort()[Math.floor(n*.98)]||1,w=Math.round(.4/dt),gap=Math.round(.09/dt),ev=new Float32Array(n);let last=-1e9;
-  for(let t=3;t<n-3;t++){const a=Math.max(0,t-w),c=Math.min(n,t+w),m=(P[c]-P[a])/(c-a),v=f[t];if(v<m*1.5/sens+.1*g/sens)continue;let ok=1;for(let q=-3;q<=3;q++)if(f[t+q]>v){ok=0;break}if(!ok||t-last<gap)continue;ev[t]=Math.min(1,.35+.65*v/g);last=t}return ev};
- const K=pick(fl[0]),Sn=pick(fl[1]),Hh=pick(fl[2]),bn=Bd.map(lnorm),ln=lnorm(L),ls=new Float32Array(F),W1=Math.max(1,Math.round(1/dt));let ac=0;for(let t=0;t<F;t++){ac+=ln[t];if(t>=W1)ac-=ln[t-W1];ls[t]=Math.min(1,ac/Math.min(t+1,W1))}
- const G=+$('#gain').value,D=+$('#dec').value,V=+$('#spd').value,tail=2+(D-.7)*40,raw=new Uint16Array(F*N),A=new Float32Array(11),pa=new Float32Array(11),bf=new Float32Array(5);
- let kb=[],sw=[],sp=[],dir=1,cur=0,sf=0,rs=12345;const rnd=()=>(rs=(rs*1664525+1013904223)>>>0)/4294967296;
+ const dtm=+$('#dt').value;
+ if(!Number.isFinite(dtm)||dtm<=0)throw Error('1行あたりの時間が正しくありません');
+ const b=S.buf,sr=b.sampleRate,dt=dtm/1000,hop=sr*dt,F=Math.max(1,Math.ceil(b.length/hop)),W=1024,H=W>>1;
+ const x=new Float32Array(b.length),nc=b.numberOfChannels;
+ for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
+ const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr)));
+ const ranges=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
+ const bands=[
+  ranges(45,80),ranges(80,120),ranges(120,180),ranges(180,280),ranges(280,420),
+  ranges(420,650),ranges(650,1000),ranges(1000,1600),ranges(1600,2600),
+  ranges(2600,4200),ranges(4200,7000),ranges(7000,12000)
+ ];
+ const rk=ranges(45,150),rs1=ranges(170,520),rs2=ranges(1800,5200),rh=ranges(6000,15000);
+ const win=Float32Array.from({length:W},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/W));
+ const re=new Float32Array(W),im=new Float32Array(W),mag=new Float32Array(H),prev=new Float32Array(H);
+ const bd=bands.map(()=>new Float32Array(F)),rms=new Float32Array(F),cent=new Float32Array(F);
+ const fluxK=new Float32Array(F),fluxS=new Float32Array(F),fluxH=new Float32Array(F);
+ const flux=new Float32Array(F);
+ const sumRange=(arr,[a,e])=>{let s=0,n=0;for(let i=a;i<e;i++){s+=arr[i];n++}return n?s/n:0};
  for(let t=0;t<F;t++){
-  const v=new Float32Array(N);
-  const pulse=Math.max(K[t]||0,Sn[t]||0,Hh[t]||0);
-  // 20 arc zones: spectral color + moving wave + stereo-like asymmetry.
-  for(let i=0;i<20;i++){
-    const u=i/19*10, k=Math.min(9,Math.floor(u)), f=u-k;
-    const e=(bn[k][t]*(1-f)+bn[Math.min(10,k+1)][t]*f);
-    const mirror=bn[Math.min(10,Math.floor((1-u/10)*10))][t];
-    const wave=.5+.5*Math.sin(t*.23+i*.72);
-    const sweep=.5+.5*Math.sin(t*.075-i*.95);
-    const beat=(K[t]||0)*(.35+.65*(i%5)/4);
-    v[i]=.10+.72*e+.18*mirror+.16*wave*e+.12*sweep*(.3+e)+beat;
-  }
-  // Kick: expanding ring.
-  if(K[t]){
-    const kk=K[t];
-    for(let i=0;i<20;i++){
-      const d=Math.min(i,19-i);
-      v[i]+=kk*Math.exp(-Math.pow(d-((t%7)+1),2)/4.5);
-    }
-  }
-  // Snare: alternating left/right sweep.
-  if(Sn[t]){
-    const side=t%2;
-    for(let i=0;i<20;i++) if((i+side)%3===0) v[i]+=.7*Sn[t];
-  }
-  // Hat: fine sparkling motion across the ring.
-  if(Hh[t]){
-    for(let j=0;j<3;j++){
-      const z=(Math.floor(t*.7)+j*7)%20;
-      v[z]+=.9*Hh[t];
-      v[(z+1)%20]+=.38*Hh[t];
-    }
-  }
-  // 11 frequency zones + 5 event zones = full 36-zone variation.
-  for(let k=0;k<11;k++){
-    const e=Math.pow(bn[k][t],1.15);
-    A[k]=e>A[k]?e:A[k]*.82;
-    pa[k]=Math.max(e,pa[k]*.90);
-    v[20+k]=Math.min(1.25,.72*A[k]+.42*pa[k]+.18*e);
-  }
-  for(let k=0;k<5;k++){
-    const beat=Math.max(K[t]||0,Sn[t]||0,Hh[t]||0);
-    v[31+k]=Math.min(1.25,beat*(.55+.45*Math.sin(t*.17+k*1.7)**2)+bf[k]*.25+sf*.35);
-  }
-  if(K[t]){cur=(cur+1)%5;bf[cur]=Math.max(bf[cur],K[t]);}
-  if(Sn[t])sf=Math.max(sf,Sn[t]);
-  for(let k=0;k<5;k++)bf[k]*=.78;
-  sf*=.72;
-  const g=(.42+.58*ls[t])*G;
-  for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.55));
+   const s0=Math.floor(t*hop-W/2);let energy=0;
+   for(let i=0;i<W;i++){const v=x[s0+i]||0;re[i]=v*win[i];im[i]=0;energy+=v*v}
+   fft(re,im);
+   let total=0,weighted=0,allFlux=0;
+   for(let i=1;i<H;i++){
+     const m=Math.log1p(42*Math.hypot(re[i],im[i])/(W/2));
+     mag[i]=m;
+     const d=Math.max(0,m-prev[i]);
+     allFlux+=d;
+     const hz=i*sr/W;
+     if(hz>40){total+=m;weighted+=hz*m}
+   }
+   rms[t]=Math.sqrt(energy/W);
+   cent[t]=total>1e-5?Math.min(1,(weighted/total)/9000):0;
+   flux[t]=allFlux;
+   fluxK[t]=sumRange(mag,rk)+sumRange(mag,ranges(50,130))*0.8;
+   fluxS[t]=sumRange(mag,rs1)+sumRange(mag,rs2)*0.8;
+   fluxH[t]=sumRange(mag,rh);
+   for(let k=0;k<bands.length;k++)bd[k][t]=sumRange(mag,bands[k]);
+   prev.set(mag);
+   if(t%24===0||t===F-1){
+     const pct=t/Math.max(1,F-1)*100;
+     progress(pct,'音の構造を解析中…');
+     say(`解析中 ${Math.round(pct)}%`);
+     await new Promise(r=>setTimeout(r,0));
+   }
+ }
+ const percentile=(a,p)=>{const q=Float32Array.from(a).sort();return q[Math.max(0,Math.min(q.length-1,Math.floor((q.length-1)*p)))]||0};
+ const normSeries=(a)=>{
+   const lo=percentile(a,.08),hi=Math.max(lo+1e-5,percentile(a,.97)),o=new Float32Array(a.length);
+   for(let i=0;i<a.length;i++)o[i]=Math.max(0,Math.min(1,(a[i]-lo)/(hi-lo)));
+   const sm=new Float32Array(a.length);
+   for(let i=0;i<a.length;i++){let s=0,n=0;for(let q=-2;q<=2;q++){const j=i+q;if(j>=0&&j<a.length){s+=o[j];n++}}sm[i]=s/n}
+   return sm;
+ };
+ const rmsN=normSeries(rms),fluxN=normSeries(flux),bk=normSeries(fluxK),bs=normSeries(fluxS),bh=normSeries(fluxH);
+ const bandN=bd.map(normSeries);
+ const detect=(src,baseStrength,minGap)=>{
+   const n=src.length,o=new Float32Array(n),prefix=new Float32Array(n+1);
+   for(let i=0;i<n;i++)prefix[i+1]=prefix[i]+src[i];
+   const gap=Math.max(2,Math.round(minGap/dt)),look=Math.max(4,Math.round(.16/dt));
+   let last=-gap;
+   for(let i=1;i<n-1;i++){
+     const a=Math.max(0,i-look),z=Math.min(n-1,i+look),mean=(prefix[z+1]-prefix[a])/Math.max(1,z-a+1);
+     const v=src[i],peak=v>=src[i-1]&&v>=src[i+1];
+     const th=mean+baseStrength*(.12+.18*(1-rmsN[i]));
+     if(peak&&v>th&&v>.2&&i-last>=gap){
+       let strength=(v-th)/(1-mean+1e-6);
+       o[i]=Math.max(.18,Math.min(1,strength*1.35));
+       last=i;
+     }
+   }
+   const tail=Math.max(1,Math.round(.10/dt));
+   for(let i=0;i<n;i++)for(let q=1;q<=tail;q++){const j=i+q;if(j<n&&o[i]>0)o[j]=Math.max(o[j],o[i]*Math.pow(.72,q))}
+   return o;
+ };
+ const K=detect(bk,.75,.11),Sn=detect(bs,.92,.09),Hh=detect(bh,1.05,.055);
+ const smooth=(a)=>{
+   const o=new Float32Array(a.length);
+   for(let i=0;i<a.length;i++){const q0=Math.max(0,i-2),q1=Math.min(a.length-1,i+2);let s=0,n=0;for(let q=q0;q<=q1;q++){s+=a[q];n++}o[i]=s/n}
+   return o;
+ };
+ const energy=smooth(rmsN),motion=smooth(fluxN),D=+$('#dec').value,G=+$('#gain').value,V=+$('#spd').value,SENS=+$('#sens').value;
+ const tailFrames=Math.max(3,Math.round((.16+D*.9)/dt));
+ const raw=new Uint16Array(F*N);
+ const trail=new Float32Array(12),beatTrail=new Float32Array(5);
+ let seed=0x4d595df4;
+ const rnd=()=>{seed|=0;seed=(seed*1664525+1013904223)|0;return(seed>>>0)/4294967296};
+ for(let t=0;t<F;t++){
+   const v=new Float32Array(N),e=energy[t],m=motion[t],cv=cent[t];
+   const kick=K[t]||0,sn=Sn[t]||0,hat=Hh[t]||0;
+   // 20 outer arc zones: evolving spectral field + three distinct transient patterns.
+   for(let i=0;i<20;i++){
+     const u=i/20*12,k=Math.min(11,Math.floor(u)),f=u-k;
+     const next=bandN[Math.min(11,k+1)];
+     const spec=bandN[k][t]*(1-f)+next[t]*f;
+     const opposite=bandN[Math.max(0,11-k)][t]*.28;
+     const travel=.5+.5*Math.sin(t*(.13+.06*V)+i*.62+cv*4.5);
+     const shimmer=.5+.5*Math.sin(t*(.33+.11*V)-i*1.31+cv*7);
+     v[i]=.035+.54*spec+.20*opposite+.16*travel*spec+.08*shimmer*m+.10*e;
+   }
+   // Kick = expanding circular shockwave with a short afterglow.
+   if(kick>0){
+     const radius=(1-(Math.max(0,kick*.78))) * 9.5;
+     for(let i=0;i<20;i++){
+       const d=Math.min(i,19-i),ring=Math.exp(-Math.pow(d-radius,2)/5.2);
+       v[i]+=kick*(.42+.58*ring);
+     }
+   }
+   // Snare = diagonal sweep, with mirrored echo.
+   if(sn>0){
+     const pos=(t*V*1.8+sn*12)%20,phase=(t%2)*.7;
+     for(let i=0;i<20;i++){
+       const d=Math.abs(i-pos);const q=Math.min(d,20-d);
+       const echo=Math.min(10,Math.abs(i-(19-pos)));
+       v[i]+=sn*(.72*Math.exp(-q*q/4.0)+.28*Math.exp(-echo*echo/8.0));
+     }
+   }
+   // Hi-hat = sparse high-frequency sparks that move instead of flashing all zones.
+   if(hat>0){
+     const count=2+Math.min(3,Math.floor(hat*3));
+     for(let n=0;n<count;n++){
+       const z=(Math.floor(t*(1.2+V*.65))+n*7+Math.floor(cv*9))%20;
+       v[z]+=hat*(.8-.12*n);
+       v[(z+1)%20]+=hat*.24;
+     }
+   }
+   // 12 spectral zones: attack + hold + controlled decay.
+   for(let k=0;k<12;k++){
+     const q=bandN[k][t],attack=Math.max(0,q-trail[k]);
+     trail[k]=Math.max(q,trail[k]*.90);
+     v[20+k]=Math.min(1,.12+q*.60+trail[k]*.25+attack*.95);
+   }
+   // 4 event zones + 1 master "pulse" zone.
+   const pulse=Math.max(kick,sn,hat,m*.62);
+   if(kick>0){const p=(t*V)%4;beatTrail[Math.floor(p)%4]=Math.max(beatTrail[Math.floor(p)%4],kick)}
+   for(let k=0;k<4;k++){
+     const wave=.5+.5*Math.sin(t*.22*V+k*1.55);
+     v[31+k]=Math.min(1,.08+beatTrail[k]*.72+wave*e*.18);
+   }
+   v[35]=Math.min(1,.12+e*.48+m*.38+pulse*.82);
+   for(let k=0;k<4;k++)beatTrail[k]*=.74;
+   // Slight deterministic variation prevents sterile repetition without adding random jumps.
+   const detail=.96+.08*rnd();
+   const master=(.24+.76*Math.pow(e,.72))*(.72+.28*Math.min(1,m*SENS))*G*detail;
+   for(let i=0;i<N;i++){
+     const shaped=Math.pow(Math.max(0,Math.min(1,v[i]*master)),1.22);
+     raw[t*N+i]=Math.max(0,Math.min(4095,Math.round(4095*shaped)));
+   }
+   if(t%48===0||t===F-1){
+     const pct=55+t/Math.max(1,F-1)*45;
+     progress(pct,'36ゾーンの光り方を構築中…');
+     say(`演出を最適化中 ${Math.round((t/Math.max(1,F-1))*100)}%`);
+     await new Promise(r=>setTimeout(r,0));
+   }
+ }
+ const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);
+ for(let t=0;t<F;t++){
+   const s=Math.max(0,Math.min(F-1,t+sh));
+   for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i];
+ }
+ S.fr=fr;S.F=F;
+ const pk=K.reduce((n,x)=>n+(x>.2?1:0),0),ps=Sn.reduce((n,x)=>n+(x>.2?1:0),0),ph=Hh.reduce((n,x)=>n+(x>.2?1:0),0);
+ say(`生成しました（${F}行×${N}列）\nキック ${pk} / スネア ${ps} / ハイハット ${ph} を検知\n1024 FFT・適応型ピーク検出・スペクトル追従で生成`);
+ $('#ex').disabled=false;$('#csv').disabled=false;
+ gi('解析完了','音の変化を36ゾーンへ立体的に配置しました。',S.name);
+ progressDone('解析完了');
 }
- const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=false;$('#csv').disabled=false;gi('解析完了','点灯データの生成が完了しました。',S.name);progressDone('解析完了')}
 $('#go').onclick=async()=>{
   $('#go').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));progress(0,'解析を準備中…');
   progress(0,'解析を準備中…');
@@ -360,7 +452,12 @@ $('#ex').onclick=async()=>{
    S.ogg=true;S.converted=true;
   }
   progress(92,'点灯データを書き込み中…');
-  const z=await deflate(csvText()),c1=await deflate(',');
+  const z=await deflate(csvText());
+  const customRaw=$('#c1').value.trim();
+  let customText=customRaw;
+  if(!customText&&S.tpl&&S.tpl.custom1)customText=S.tpl.custom1;
+  if(!customText)customText=',';
+  const c1=await deflate(customText);
   const out=rewrite(S.u8,{title:S.name,album:'Glyph Tools v2',author:b64(z),composer:'v1-Asteroids Glyph Composer',custom1:b64(c1),custom2:'36cols'});
   await validateComposition(out);
   dl(out,S.name+'_glyph.ogg');
