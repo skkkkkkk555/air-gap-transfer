@@ -27,7 +27,7 @@ if(location.search.includes('swclean=1')){
 
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#d71921;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#777773;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141414;--card:#1f1f1e;--ink:#ececE8;--mut:#9a9992;--line:#383733}}
 :root[data-theme="dark"]{--bg:#141414;--card:#1f1f1e;--ink:#ecece8;--mut:#9a9992;--line:#383733}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -66,13 +66,29 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 .gi-box{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
 .gi-label{display:block;color:var(--mut);font-size:11px;letter-spacing:.08em}
 .gi-value{display:block;margin-top:2px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:5px;padding:10px;border:1px solid var(--line);border-radius:12px;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--acc) 8%,var(--bg)),var(--bg) 64%)}
-.gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0;transition:transform .12s ease,opacity .12s ease,box-shadow .12s ease}.gi-zone.active{transform:scale(1.14)}
-.gi-zone.active{background:radial-gradient(circle at 35% 30%,#fff,var(--acc) 42%,#8b0910 100%);box-shadow:0 0 7px rgba(215,25,33,.35),0 0 18px rgba(215,25,33,.22)}
-.gi-zone.scanning{animation:giScan .55s ease-in-out infinite alternate}
-@keyframes giScan{from{transform:scale(.72);opacity:.35}to{transform:scale(1.08);opacity:1}}
-.gi-foot{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin-top:7px}
-@media(max-width:380px){.gi-panel{grid-template-columns:1fr}.gi-zones{grid-template-columns:repeat(9,1fr)}}
+
+.gi-zones{position:relative;padding:0;border:1px solid var(--line);border-radius:16px;background:#111;overflow:hidden}
+.gi-svg{display:block;width:100%;height:auto;touch-action:none;user-select:none}
+.gi-phone{fill:#0c0c0c;stroke:#3c3c3c;stroke-width:2}
+.gi-camera-ring{fill:#161616;stroke:#323232;stroke-width:2}
+.gi-camera{fill:#090909;stroke:#5b5b5b;stroke-width:2}
+.gi-camera-lens{fill:#050505;stroke:#444;stroke-width:2}
+.gi-zone{cursor:pointer}
+.gi-zone .gi-hit{fill:none;stroke:transparent;stroke-width:24;stroke-linecap:round;pointer-events:stroke}
+.gi-zone .gi-light{fill:none;stroke:#777;stroke-width:8;stroke-linecap:round;pointer-events:none;opacity:.16;transition:opacity .08s linear,stroke-width .08s linear,filter .08s linear}
+.gi-zone.active .gi-light{stroke:#fff}
+.gi-zone.scanning .gi-light{animation:giScan .55s ease-in-out infinite alternate}
+@keyframes giScan{from{opacity:.25;stroke-width:5}to{opacity:1;stroke-width:10}}
+.manual-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.manual-toolbar>*{min-width:0}
+.manual-toolbar select{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.manual-line{display:flex;gap:8px;align-items:center;margin-top:8px}
+.manual-line button{margin:0}
+.manual-line input[type=range]{flex:1}
+.manual-clock{font:800 12px "Doto",monospace;min-width:84px;text-align:right}
+.manual-note{font-size:11px;color:var(--mut);margin-top:7px}
+@media(max-width:380px){.gi-panel{grid-template-columns:1fr}.manual-toolbar{grid-template-columns:1fr}}
+
 </style></head><body>
 <h1>Glyphトーン工房</h1>
 <p class="sub">Phone (3a)・36ゾーン専用。音の変化を解析して、瞬間演出と残光を組み合わせたGlyphパターンを生成します。</p>
@@ -82,7 +98,19 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
     <div class="gi-box"><span class="gi-label">INPUT</span><span class="gi-value" id="giInput">未選択</span></div>
     <div class="gi-box"><span class="gi-label">STATUS</span><span class="gi-value" id="giStatus">待機中</span></div>
   </div>
-  <div class="gi-zones"><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i></div>
+  
+<div class="gi-zones">
+  <svg id="giSvg" class="gi-svg" viewBox="0 0 360 500" role="img" aria-label="Nothing Phone (3a) Glyph Interface 36 zones">
+    <rect class="gi-phone" x="18" y="8" width="324" height="484" rx="34"/>
+    <circle class="gi-camera-ring" cx="180" cy="174" r="128"/>
+    <rect class="gi-camera" x="106" y="142" width="148" height="64" rx="32"/>
+    <circle class="gi-camera-lens" cx="143" cy="174" r="17"/>
+    <circle class="gi-camera-lens" cx="214" cy="174" r="21"/>
+    <circle cx="214" cy="174" r="9" fill="#000" stroke="#666" stroke-width="1"/>
+    <g id="giZoneLayer"></g>
+    <path d="M45 370h270M78 399h204M104 428h152" stroke="#2d2d2d" stroke-width="3" stroke-linecap="round"/>
+  </svg>
+</div>
   <div class="gi-foot"><span id="giHint">音源を選択すると解析できます</span><b>36 ZONES</b></div>
 </section>
 
@@ -92,19 +120,50 @@ canvas{width:310px;height:420px;max-width:100%;filter:drop-shadow(0 14px 28px rg
 <div id="info" class="sub" style="margin-top:8px"></div>
 <audio id="au" controls></audio></section>
 
+
 <section><h2>2. 演出</h2>
+<label>モード
+<select id="editMode">
+  <option value="auto">自動解析 — 3パターンを音に合わせて切替</option>
+  <option value="manual">手動モード — タップ / スライド / 多重合成</option>
+</select>
+</label>
+<div id="manualPanel" class="manual-toolbar" hidden>
+  <select id="manualFx">
+    <option value="tap">TAP — その場所だけ瞬間発光</option>
+    <option value="echo">ECHO×4 — 過去4点を薄く残像</option>
+    <option value="ripple">RIPPLE — 周囲へ波紋</option>
+    <option value="orbit">ORBIT — 円環を走査</option>
+    <option value="mirror">MIRROR — 対称位置も同時発光</option>
+    <option value="spark">SPARK — 周辺へ細かい閃光</option>
+    <option value="flow">FLOW — スライド軌跡をそのまま記録</option>
+  </select>
+  <button id="manualUndo">直前を取消</button>
+</div>
+<label>手動の光度 <span id="mv1">1.00</span><input type="range" id="manualBright" min="0.15" max="1" step="0.05" value="1"></label>
+<label>手動の残光 <span id="mv2">0.36</span><input type="range" id="manualTail" min="0.05" max="0.85" step="0.01" value="0.36"></label>
+<div class="manual-line" id="manualTransport" hidden>
+  <button class="main" id="manualPlay">▶ 再生</button>
+  <input type="range" id="manualSeek" min="0" max="1" step="0.001" value="0" aria-label="再生位置">
+  <span class="manual-clock" id="manualClock">00:00.0</span>
+</div>
+<div class="manual-line" id="manualActions" hidden>
+  <button id="manualClear">手動データを全消去</button>
+  <span class="manual-clock" id="manualCount">0 EVENTS</span>
+</div>
+<div class="manual-note" id="manualNote">Glyph Interfaceを直接タップ。押したまま滑らせると連続記録できます。</div>
 <label>明るさ <span id="v1">1.0</span><input type="range" id="gain" min="0.5" max="1.3" step="0.05" value="1"></label>
 <label>光の尾の長さ <span id="v2">0.86</span><input type="range" id="dec" min="0.7" max="0.95" step="0.01" value="0.86"></label>
 <label>掃引の速さ <span id="v3">1.0</span><input type="range" id="spd" min="0.4" max="2.5" step="0.1" value="1"></label>
 <label>音の検知感度(右ほど細かい音も拾う) <span id="v4">1.0</span><input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"></label>
 <label>タイミング補正(ミリ秒、+で光を早める) <span id="v5">0</span><input type="range" id="lat" min="-150" max="150" step="5" value="0"></label>
-<button class="main" id="go" disabled>点灯データを生成</button>
+<button class="main" id="go" disabled>3パターンを自動解析して生成</button>
 <div id="progressWrap" class="progress-wrap">
   <div class="progress-top"><span><i class="progress-pulse"></i><span id="progressText">準備中…</span></span><b id="progressPct">0%</b></div>
   <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
 </div>
 <div class="stage" style="margin-top:12px"><canvas id="cv" width="620" height="680"></canvas><div id="cnt"></div></div>
-<div class="sub" style="text-align:center">外周＝音楽全体の動き / 中段＝周波数 / 内周＝キック・スネア・ハイハット / 中心＝総合パルス</div></section>
+<div class="sub" style="text-align:center">C＝主アーク / A＝右アーク / B＝短い斜めチューブ。強さ・速度・音域で3パターンを切り替えます。</div></section>
 
 <section><h2>3. 書き出し</h2>
 <label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.666"></label>
