@@ -213,7 +213,7 @@ $('#f').onchange=async e=>{
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
   $('#au').src=URL.createObjectURL(f);
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
-  if(!isOgg)msg+='\\nOGG(Vorbis)変換は「OGGを書き出す」時だけ実行します';
+  if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(isOgg)try{
    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
    const a=c.find(s=>/^AUTHOR=/i.test(s));
@@ -331,8 +331,8 @@ $('#ex').onclick=async()=>{
   $('#ex').disabled=true;
   if(!S.buf)throw Error('先に音源を選択してください');
   if(!S.ogg){
-   gi('OGG変換中…','書き出し用のVorbis OGGを作成しています。',S.name);
-   say('書き出し用OGGを変換中…');
+   gi('OGG変換中…','Composer互換のOgg Opusを作成しています。',S.name);
+   say('Composer互換のOgg Opusへ変換中…');
    progress(0,'Composer互換Ogg Opusへ変換中…');
    S.u8=await convertBufferToOgg(S.buf);
    S.ogg=true;S.converted=true;
