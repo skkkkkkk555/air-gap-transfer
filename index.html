@@ -279,18 +279,29 @@ function rewrite(u,meta){
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
  S.name=f.name.replace(/\.[^.]+$/,'');S.u8=null;S.ogg=false;S.sourceOgg=false;S.converted=false;S.fr=null;S.F=0;S.tpl=null;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込んでいます…',true);document.querySelectorAll('.gi-zone').forEach(x=>x.classList.add('scanning'));
+
+ const au=$('#au');
+ if(!au)throw Error('音声プレーヤーが見つかりません');
+ const audioUrl=URL.createObjectURL(f);
+ au.pause();
+ au.onerror=null;
+ au.onloadedmetadata=null;
+ au.removeAttribute('src');
+ au.load();
+ au.onerror=()=>{
+   const er=au.error,code=er?er.code:0;
+   const detail=code===1?'読み込みが中断':code===2?'データ取得エラー':code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':'不明なメディアエラー';
+   say('再生失敗：'+detail+' / MIME='+(f.type||'不明')+' / code='+code,1);
+ };
+ au.onloadedmetadata=()=>{
+   if(au.duration&&Number.isFinite(au.duration)) $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒';
+ };
+ au.src=audioUrl;
+ au.load();
+
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
-  const audioUrl=URL.createObjectURL(f);
-  const au=$('#au');
-  au.pause();
-  au.removeAttribute('src');
-  au.load();
-  au.src=audioUrl;
-  au.load();
-  au.onerror=()=>say('音源を再生できません: '+(au.error?.message||'このブラウザが対応していない音声形式の可能性があります'),1);
-  au.onloadedmetadata=()=>{ if(au.duration&&Number.isFinite(au.duration)) $('#info').textContent=f.name+' / '+au.duration.toFixed(1)+'秒'; };
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
   let sourceIsOpus=false;
   if(isOgg){try{const pp=pages(originalU8),qq=packets(originalU8,pp);sourceIsOpus=new TextDecoder().decode(qq[0].data.subarray(0,8))==='OpusHead'}catch(_){}}
@@ -320,8 +331,6 @@ $('#f').onchange=async e=>{
   if(reusableOgg)S.u8=originalU8,S.ogg=true;
   S.F=Math.max(1,Math.ceil(S.buf.duration/((+$('#dt').value||16.666)/1000)));
   S.fr=null;
-
-  $('#au').load();
   let msg=S.buf.duration.toFixed(1)+'秒 / '+(reusableOgg?'Ogg Opus':'元音源');
   if(!reusableOgg)msg+='\\nComposer互換のOgg Opusへ変換します';
   if(reusableOgg)try{
