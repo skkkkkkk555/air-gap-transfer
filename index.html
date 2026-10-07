@@ -100,9 +100,9 @@ function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<
 $('#f').onchange=async e=>{const f=e.target.files[0];if(!f)return;S.name=f.name.replace(/\.[^.]+$/,'');gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
  try{const ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=String.fromCharCode(...S.u8.subarray(0,4))==='OggS';
  S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);S.fr=null;S.tpl=null;
- let msg=\`\u0024{S.buf.duration.toFixed(1)}秒 / \u0024{S.ogg?'OGG':'OGG以外(プレビューとCSVのみ可)'}\`;
+ let msg=`${S.buf.duration.toFixed(1)}秒 / ${S.ogg?'OGG':'OGG以外(プレビューとCSVのみ可)'}`;
  if(S.ogg){try{const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);const a=c.find(s=>/^AUTHOR=/i.test(s));if(a){const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
-\$('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);msg+=\`\n既存の点灯データを検出: \u0024{rows.length}行×\u0024{cols}列 → 1行=\u0024{\$('#dt').value}ミリ秒に合わせました\`+(cols!==N?\`\n列数が\u0024{N}ではありません。3a以外の可能性があります\`:'')}
+$('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);msg+=`\n既存の点灯データを検出: ${rows.length}行×${cols}列 → 1行=${$('#dt').value}ミリ秒に合わせました`+(cols!==N?`\n列数が${N}ではありません。3a以外の可能性があります`:'')}
   const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)'}catch(_){}}
  gi('準備完了','「点灯データを生成」を押してください。',f.name);$('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;say('「点灯データを生成」を押してください')}catch(x){say('読み込めません: '+x.message,1)}};
 ['gain','dec','spd','sens','lat'].forEach((id,i)=>$('#'+id).oninput=e=>$('#v'+(i+1)).textContent=(+e.target.value).toFixed(id=='dec'?2:id=='lat'?0:1));
@@ -122,7 +122,7 @@ async function gen(){
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%300==0){say(\`解析中 \u0024{Math.round(t/F*100)}%\`);await new Promise(r=>setTimeout(r))}}
+  if(t%300==0){say(`解析中 ${Math.round(t/F*100)}%`);await new Promise(r=>setTimeout(r))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
@@ -144,7 +144,7 @@ async function gen(){
   for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
   const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(\`生成しました(\u0024{F}行×\u0024{N}列)\nキック\u0024{K.filter(Boolean).length}回 / スネア\u0024{Sn.filter(Boolean).length}回 / ハイハット\u0024{Hh.filter(Boolean).length}回を検知\`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
+ S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
 $('#go').onclick=()=>{$('#go').disabled=true;gen().catch(e=>say('生成に失敗: '+e.message,1)).finally(()=>$('#go').disabled=false)};
 
 /* ---- 書き出し ---- */
@@ -162,7 +162,7 @@ function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTim
  cx.beginPath();cx.roundRect(2,3,306,420,44);cx.fillStyle='#1a1a1a';cx.fill();
  cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
  cx.lineCap='round';cx.lineWidth=8;
- for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=\`rgba(255,255,255,\u0024{.1+.9*v})\`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
+ for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=`rgba(255,255,255,${.1+.9*v})`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
  cx.shadowBlur=0;$('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';requestAnimationFrame(draw)}
 gi('待機中','音源を選択すると解析できます');draw();setInterval(updateGI,80);
 </script></body></html>
