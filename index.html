@@ -227,7 +227,7 @@ function setManualUI(){
   const manual=modeValue()==='manual';
   $('#manualPanel').hidden=!manual;$('#manualTransport').hidden=!manual;$('#manualActions').hidden=!manual;$('#go').style.display=manual?'none':'';
   if(manual){
-    S.fr=S.manualFr||null;$('#ex').disabled=!S.fr;$('#csv').disabled=!S.fr;
+    S.fr=S.manualFr||null;$('#ex').disabled=!(S.fr&&S.manualEvents.length);$('#csv').disabled=!(S.fr&&S.manualEvents.length);
     gi('手動編集中','音源を再生しながらGlyphをタップ / スライドしてください。',S.name);
   }else{
     S.fr=S.autoFr||null;$('#ex').disabled=!S.fr;$('#csv').disabled=!S.fr;
@@ -299,7 +299,7 @@ function rebuildManual(){
     }
   }
   S.manualFr=out;S.F=out.length/36;
-  if(modeValue()==='manual'){S.fr=out;$('#ex').disabled=false;$('#csv').disabled=false}
+  if(modeValue()==='manual'){S.fr=out;const ready=S.manualEvents.length>0;$('#ex').disabled=!ready;$('#csv').disabled=!ready}
   $('#manualCount').textContent=S.manualEvents.length+' EVENTS';
 }
 const findZone=e=>{const g=e.target&&e.target.closest?e.target.closest('.gi-zone'):null;return g?Number(g.getAttribute('data-zone')):-1};
