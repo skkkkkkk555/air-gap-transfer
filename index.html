@@ -1,45 +1,215 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="app-version" content="41d7361-cleanup1">
+<script>
+/* Clean up stale service workers left by older versions of this app. */
+(async()=>{
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    const base=new URL('./',location.href).href;
+    const regs=await navigator.serviceWorker.getRegistrations();
+    const stale=regs.filter(r=>r.scope.startsWith(base));
+    if(stale.length && !sessionStorage.getItem('glyph-sw-cleaned')){
+      sessionStorage.setItem('glyph-sw-cleaned','1');
+      await Promise.all(stale.map(r=>r.unregister()));
+      location.reload();
+    }
+  }catch(_){}
+})();
+</script>
+<title>Glyphトーン工房 3a</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#d71921;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141414;--card:#1f1f1e;--ink:#ececE8;--mut:#9a9992;--line:#383733}}
+:root[data-theme="dark"]{--bg:#141414;--card:#1f1f1e;--ink:#ecece8;--mut:#9a9992;--line:#383733}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.6 "Zen Kaku Gothic New",system-ui,sans-serif;padding:16px;max-width:560px;margin-inline:auto}
+h1{font-size:22px;margin:4px 0 2px}
+.sub{color:var(--mut);margin:0 0 16px;font-size:13px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+h2{font-size:14px;margin:0 0 8px}
+label{display:block;font-size:13px;color:var(--mut);margin-top:10px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=text],input[type=number]{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+button{font:700 14px inherit;font-family:inherit;padding:10px 14px;border-radius:6px;border:1px solid var(--ink);background:var(--bg);color:var(--ink);margin:8px 6px 0 0}
+button.main{background:var(--acc);border-color:var(--acc);color:#fff}
+button:disabled{opacity:.4}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#st{font-size:13px;color:var(--mut);white-space:pre-wrap;margin-top:8px;min-height:20px}
+.progress-wrap{display:none;margin-top:12px}
+.progress-wrap.show{display:block}
+.progress-top{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mut);margin-bottom:6px}
+.progress-track{height:8px;border-radius:99px;background:var(--line);overflow:hidden;position:relative}
+.progress-bar{height:100%;width:0%;background:var(--acc);border-radius:99px;transition:width .12s ease}
+.progress-bar.indeterminate{width:35%!important;animation:progressMove 1s ease-in-out infinite}
+@keyframes progressMove{0%{transform:translateX(-110%)}50%{transform:translateX(190%)}100%{transform:translateX(310%)}}
+.progress-pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--acc);margin-right:5px;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.25)}}
+#st.err{color:var(--acc)}
+audio{width:100%;margin-top:8px}
+.stage{display:flex;justify-content:center;position:relative}
+canvas{width:300px;height:329px;max-width:100%}
+#cnt{font:800 20px "Doto",monospace;position:absolute;right:0;top:0;color:var(--ink)}
+
+#glyphInterface{display:block!important;visibility:visible!important;opacity:1!important}
+.gi-title{font:800 16px "Doto",monospace;letter-spacing:.08em;margin:0 0 10px}
+.gi-panel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.gi-box{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.gi-label{display:block;color:var(--mut);font-size:11px;letter-spacing:.08em}
+.gi-value{display:block;margin-top:2px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gi-zones{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.gi-zone{display:block;aspect-ratio:1;border-radius:50%;background:var(--line);min-width:0}
+.gi-zone.active{background:var(--acc);box-shadow:0 0 8px rgba(215,25,33,.45)}
+.gi-zone.scanning{animation:giScan .55s ease-in-out infinite alternate}
+@keyframes giScan{from{transform:scale(.72);opacity:.35}to{transform:scale(1.08);opacity:1}}
+.gi-foot{display:flex;justify-content:space-between;align-items:center;color:var(--mut);font-size:11px;margin-top:7px}
+@media(max-width:380px){.gi-panel{grid-template-columns:1fr}.gi-zones{grid-template-columns:repeat(9,1fr)}}
+</style></head><body>
+<h1>Glyphトーン工房</h1>
+<p class="sub">Phone (3a) の36ゾーン向け。音を解析して点灯データを作り、OGGに埋め込みます。</p>
+<section id="glyphInterface">
+  <div class="gi-title">GLYPH INTERFACE</div>
+  <div class="gi-panel">
+    <div class="gi-box"><span class="gi-label">INPUT</span><span class="gi-value" id="giInput">未選択</span></div>
+    <div class="gi-box"><span class="gi-label">STATUS</span><span class="gi-value" id="giStatus">待機中</span></div>
+  </div>
+  <div class="gi-zones"><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i><i class="gi-zone"></i></div>
+  <div class="gi-foot"><span id="giHint">音源を選択すると解析できます</span><b>36 ZONES</b></div>
+</section>
+
+
+<section><h2>1. 音源</h2>
+<input type="file" id="f" accept=".ogg,.mp3,.wav,.m4a,audio/*">
+<div id="info" class="sub" style="margin-top:8px"></div>
+<audio id="au" controls></audio></section>
+
+<section><h2>2. 演出</h2>
+<label>明るさ <span id="v1">1.0</span><input type="range" id="gain" min="0.5" max="1.3" step="0.05" value="1"></label>
+<label>光の尾の長さ <span id="v2">0.86</span><input type="range" id="dec" min="0.7" max="0.95" step="0.01" value="0.86"></label>
+<label>掃引の速さ <span id="v3">1.0</span><input type="range" id="spd" min="0.4" max="2.5" step="0.1" value="1"></label>
+<label>音の検知感度(右ほど細かい音も拾う) <span id="v4">1.0</span><input type="range" id="sens" min="0.5" max="2" step="0.1" value="1"></label>
+<label>タイミング補正(ミリ秒、+で光を早める) <span id="v5">0</span><input type="range" id="lat" min="-150" max="150" step="5" value="0"></label>
+<button class="main" id="go" disabled>点灯データを生成</button>
+<div id="progressWrap" class="progress-wrap">
+  <div class="progress-top"><span><i class="progress-pulse"></i><span id="progressText">準備中…</span></span><b id="progressPct">0%</b></div>
+  <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+</div>
+<div class="stage" style="margin-top:12px"><canvas id="cv" width="620" height="680"></canvas><div id="cnt"></div></div>
+<div class="sub" style="text-align:center">左上の弧=キックの衝撃波・スネアの掃引・ハイハットの瞬き / 右の弧=スペクトル / 左下=キックで進む点</div></section>
+
+<section><h2>3. 書き出し</h2>
+<label>1行あたりの時間(ミリ秒)<input type="number" id="dt" step="0.001" value="16.667"></label>
+<label>CUSTOM1タグ(空欄なら元のOGGの値を引き継ぐ)<input type="text" id="c1"></label>
+<button class="main" id="ex" disabled>OGGを書き出す</button>
+<button id="csv" disabled>CSVを保存</button>
+<div id="st"></div></section>
+
+<script>
+const $=s=>document.querySelector(s),N=36;
+const S={buf:null,u8:null,ogg:false,fr:null,tpl:null,name:'glyph',tags:null,vendor:null,converted:false};
+const progress=(pct,text,ind=false)=>{
+  const w=$('#progressWrap'),b=$('#progressBar');
+  w.classList.add('show');$('#progressText').textContent=text;$('#progressPct').textContent=ind?'':Math.round(pct)+'%';
+  b.classList.toggle('indeterminate',ind);if(!ind)b.style.width=Math.max(0,Math.min(100,pct))+'%';
+};
+const progressDone=text=>{progress(100,text);setTimeout(()=>$('#progressWrap').classList.remove('show'),1600)};
+const gi=(status,hint,input)=>{$('#giStatus').textContent=status;$('#giHint').textContent=hint;$('#giInput').textContent=input||'未選択';document.querySelectorAll('.gi-zone').forEach(x=>x.classList.toggle('scanning',status.includes('解析')||status.includes('変換')||status.includes('読み込み')))};
+const updateGI=()=>{const z=document.querySelectorAll('.gi-zone');const au=$('#au');if(!S.fr||!S.F){z.forEach(x=>x.classList.remove('active'));return}const i=Math.min(S.F-1,Math.max(0,Math.floor(au.currentTime/(+$('#dt').value/1000))));for(let k=0;k<36;k++)z[k].classList.toggle('active',S.fr[i*36+k]>800);};
+const say=(m,e)=>{$('#st').textContent=m;$('#st').className=e?'err':''};
+const cat=a=>{let n=0;a.forEach(x=>n+=x.length);const o=new Uint8Array(n);let p=0;a.forEach(x=>{o.set(x,p);p+=x.length});return o};
+const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)};
+const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
+
+/* ---- 音源→Vorbis OGG変換（FFmpeg不要） ---- */
+let oggEncoderModule=null;
+async function ensureOggEncoder(){
+  if(oggEncoderModule)return oggEncoderModule;
+  progress(2,'OGG変換エンジンを読み込み中…',true);
+  const mod=await import('https://esm.sh/@audio/encode-ogg@1.2.2?bundle');
+  oggEncoderModule=mod.default||mod.ogg||mod;
+  if(typeof oggEncoderModule!=='function')throw Error('OGG変換エンジンの初期化に失敗しました');
+  return oggEncoderModule;
+}
+async function convertBufferToOgg(audioBuffer){
+  const ogg=await ensureOggEncoder();
+  const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
+  const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
+  const encoder=await ogg({sampleRate,channels,quality:5}),parts=[];
+  const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
+  for(let pos=0;pos<total;pos+=chunkSize){
+    const end=Math.min(total,pos+chunkSize),data=[];
+    for(let c=0;c<channels;c++)data.push(audioBuffer.getChannelData(c).subarray(pos,end));
+    const part=encoder.encode(data);if(part&&part.length)parts.push(part);
+    progress(5+end/Math.max(1,total)*90,'MP3をOGG(Vorbis)へ変換中…');
+    await new Promise(r=>setTimeout(r,0));
+  }
+  const tail=encoder.flush();if(tail&&tail.length)parts.push(tail);
+  progressDone('OGG変換完了');
+  return cat(parts);
+}
+/* ---- OGG ---- */
+const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
+const crc=b=>{let c=0;for(let i=0;i<b.length;i++)c=((c<<8)^T[((c>>>24)^b[i])&255])>>>0;return c};
+function pages(u){const p=[];let o=0;while(o+27<=u.length&&u[o]==79&&u[o+1]==103){const n=u[o+26],seg=Array.from(u.subarray(o+27,o+27+n));const e=o+27+n+seg.reduce((a,b)=>a+b,0);p.push({o,hdr:27+n,seg,end:e});o=e}return p}
+function headers(u,P){const pk=[];let cur=[],k=0;for(;k<P.length;k++){const p=P[k];let o=p.o+p.hdr;for(const s of p.seg){cur.push(u.subarray(o,o+s));o+=s;if(s<255){pk.push(cat(cur));cur=[]}}if(pk.length>=3)break}return{pk,last:k}}
+function parseC(p){const d=new DataView(p.buffer,p.byteOffset,p.byteLength),td=new TextDecoder();let o=7;const vl=d.getUint32(o,true);o+=4;const vendor=p.slice(o,o+vl);o+=vl;const n=d.getUint32(o,true);o+=4;const c=[];for(let i=0;i<n;i++){const l=d.getUint32(o,true);o+=4;c.push(td.decode(p.subarray(o,o+l)));o+=l}return{vendor,c}}
+function buildC(v,c){const te=new TextEncoder(),u32=n=>{const a=new Uint8Array(4);new DataView(a.buffer).setUint32(0,n,true);return a};const q=[new Uint8Array([3,118,111,114,98,105,115]),u32(v.length),v,u32(c.length)];c.forEach(s=>{const e=te.encode(s);q.push(u32(e.length),e)});q.push(new Uint8Array([1]));return cat(q)}
+function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{for(let i=0;i<Math.floor(p.length/255);i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255);li+=seg.length;const len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]==255?1:0}return{out,seq}}
+function rewrite(u,author){const P=pages(u),{pk,last}=headers(u,P);if(pk.length<3)throw Error('OGGの構造を読めません');if(String.fromCharCode(...pk[0].subarray(1,7))!=='vorbis')throw Error('Vorbis形式のOGGのみ対応です(Opusは不可)');const{vendor,c}=parseC(pk[1]);const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1)=/i.test(s));const old1=c.find(s=>/^CUSTOM1=/i.test(s));const v1=$('#c1').value.trim();keep.push('AUTHOR='+author);if(v1)keep.push('CUSTOM1='+v1);else if(old1)keep.push(old1);const serial=u.subarray(P[0].o+14,P[0].o+18);const np=paginate([buildC(vendor,keep),pk[2]],serial,1);const parts=[u.subarray(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end);new DataView(pg.buffer).setUint32(18,seq++,true);new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
+
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
+ S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
  try{
-  const original=await f.arrayBuffer();
-  const originalU8=new Uint8Array(original);
+  const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
-  let ab=original,displayFile=f;
-  if(!isOgg){
-    progress(0,'OGG(Vorbis)へ自動変換中…',true);
-    const ogg=await convertToOgg(f);
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
+  const ctx=new AC();
+  progress(2,'音声を読み込み中…',true);
+  S.buf=await ctx.decodeAudioData(original.slice(0));
+  if(ctx.close)try{await ctx.close()}catch(_){}
+  let displayFile=f;
+  if(isOgg){S.u8=originalU8;S.ogg=true}
+  else{
+    progress(3,'OGG(Vorbis)へ自動変換を開始…');
+    const ogg=await convertBufferToOgg(S.buf);
     S.u8=ogg;S.ogg=true;S.converted=true;
-    ab=ogg.buffer.slice(ogg.byteOffset,ogg.byteOffset+ogg.byteLength);
     displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
-  }else{
-    S.u8=originalU8;S.ogg=true;
   }
-  S.buf=await new AudioContext().decodeAudioData(ab.slice(0));
   $('#au').src=URL.createObjectURL(displayFile);S.fr=null;S.tpl=null;
-  let msg=`${S.buf.duration.toFixed(1)}秒 / OGG(Vorbis)`;
+  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
   if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
-  try{
-   const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
-   const a=c.find(s=>/^AUTHOR=/i.test(s));
-   if(a){
-    const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
-    const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;
-    S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
-    $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-    msg+=`\\n既存の点灯データを検出: ${rows.length}行×${cols}列 → 1行=${$('#dt').value}ミリ秒に合わせました`+(cols!==N?`\\n列数が${N}ではありません。3a以外の可能性があります`:'');
-   }
-   const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+  if(isOgg)try{
+    const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
+    const a=c.find(s=>/^AUTHOR=/i.test(s));
+    if(a){
+      const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
+      const rows=txt.split(/\r?\n/).filter(x=>x.trim());
+      const cols=rows[0].split(',').filter(x=>x!=='').length;
+      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+      $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
+      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+    }
+    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
   gi('準備完了','「点灯データを生成」を押してください。',f.name);
   $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
   say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
+  progressDone('音源の準備完了');
+ }catch(x){
   $('#progressWrap').classList.remove('show');
- }catch(x){$('#progressWrap').classList.remove('show');say('読み込めません: '+x.message,1);gi('エラー','音源を読み込めませんでした。',f.name)}
+  say('読み込めません: '+(x&&x.message||x),1);
+  gi('エラー','音源を読み込めませんでした。',f.name)
+ }
 };
-
 /* ---- 解析・演出 ---- */
 function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
 function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
@@ -57,120 +227,7 @@ async function gen(){
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%24==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
- const bl=Math.max(1,Math.round(.5/dt));
- const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
-  const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
-  for(let t=0;t<n;t++){const p=t/bl-.5,j=Math.floor(p),f=p-j,m0=sc[Math.max(0,Math.min(nb-1,j))],m1=sc[Math.max(0,Math.min(nb-1,j+1))],m=Math.max(m0+(m1-m0)*f,lo+(gm-lo)*.35);o[t]=Math.max(0,Math.min(1.1,(col[t]-lo)/(m-lo+1e-6)))}return o};
- const sens=+$('#sens').value,pick=f=>{const n=f.length,P=new Float32Array(n+1);for(let i=0;i<n;i++)P[i+1]=P[i]+f[i];const g=Float32Array.from(f).sort()[Math.floor(n*.98)]||1,w=Math.round(.4/dt),gap=Math.round(.09/dt),ev=new Float32Array(n);let last=-1e9;
-  for(let t=3;t<n-3;t++){const a=Math.max(0,t-w),c=Math.min(n,t+w),m=(P[c]-P[a])/(c-a),v=f[t];if(v<m*1.5/sens+.1*g/sens)continue;let ok=1;for(let q=-3;q<=3;q++)if(f[t+q]>v){ok=0;break}if(!ok||t-last<gap)continue;ev[t]=Math.min(1,.35+.65*v/g);last=t}return ev};
- const K=pick(fl[0]),Sn=pick(fl[1]),Hh=pick(fl[2]),bn=Bd.map(lnorm),ln=lnorm(L),ls=new Float32Array(F),W1=Math.max(1,Math.round(1/dt));let ac=0;for(let t=0;t<F;t++){ac+=ln[t];if(t>=W1)ac-=ln[t-W1];ls[t]=Math.min(1,ac/Math.min(t+1,W1))}
- const G=+$('#gain').value,D=+$('#dec').value,V=+$('#spd').value,tail=2+(D-.7)*40,raw=new Uint16Array(F*N),A=new Float32Array(11),pa=new Float32Array(11),bf=new Float32Array(5);
- let kb=[],sw=[],sp=[],dir=1,cur=0,sf=0,rs=12345;const rnd=()=>(rs=(rs*1664525+1013904223)>>>0)/4294967296;
- for(let t=0;t<F;t++){
-  if(K[t]){kb.push({a:0,s:K[t]});cur=(cur+1)%5;bf[cur]=Math.max(bf[cur],K[t])}
-  if(Sn[t]){sw.push({a:0,s:Sn[t],d:dir});dir=-dir;sf=Math.max(sf,Sn[t])}
-  if(Hh[t]){const n=2+(rnd()*2|0);for(let j=0;j<n;j++)sp.push({a:0,z:rnd()*20|0,s:Hh[t]})}
-  const v=new Float32Array(N),base=.1*(bn[0][t]+bn[1][t])/2;for(let i=0;i<20;i++)v[i]=base;
-  kb=kb.filter(k=>{const r=k.a*1.1*V,amp=k.s*Math.exp(-k.a/(5+tail));if(amp<.02||r>16)return false;for(let i=0;i<20;i++){const d=Math.abs(i-9.5);v[i]+=amp*(Math.exp(-((d-r)*(d-r))/5)+(d<r?.25*Math.exp(-(r-d)/4):0))}k.a++;return true});
-  sw=sw.filter(w=>{const hd=w.d>0?w.a*1.5*V:19-w.a*1.5*V,amp=w.s*Math.exp(-w.a/(10+tail));if(amp<.03||(w.d>0?hd-tail*2>19:hd+tail*2<0))return false;for(let i=0;i<20;i++){const bh=(hd-i)*w.d;v[i]+=.9*amp*(bh>=0?Math.exp(-bh/(tail*.5)):Math.exp(bh*2))}w.a++;return true});
-  sp=sp.filter(q=>{const amp=q.s*Math.exp(-q.a/3);if(q.a>14)return false;v[q.z]+=.8*amp;v[(q.z+1)%20]+=.4*amp;q.a++;return true});
-  for(let k=0;k<11;k++){const bi=10-k,e=Math.pow(bn[bi][t],1.3);A[k]=e>A[k]?e:A[k]*.86;pa[k]=Math.max(e,pa[k]*.93);v[20+k]=.85*A[k]+.25*pa[k]}
-  for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
-  const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
- const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false;progressDone('解析完了')}
-$('#go').onclick=async()=>{
-  $('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;gi('解析中…','音源を解析して点灯データを生成しています。',S.name);
-  progress(0,'解析を準備中…');
-  try{await gen()}catch(e){progressDone('解析失敗');say('生成に失敗: '+(e&&e.message||e),1);gi('エラー','解析に失敗しました。',S.name)}finally{$('#go').disabled=false}
-};
-
-/* ---- 書き出し ---- */
-function csvText(){const o=S.tpl||{comma:true,eol:'\r\n',tail:true},rows=[];for(let t=0;t<S.F;t++)rows.push(Array.from(S.fr.subarray(t*N,t*N+N)).join(',')+(o.comma?',':''));return rows.join(o.eol)+(o.tail?o.eol:'')}
-const dl=(u,n)=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([u]));a.download=n;a.click()};
-$('#ex').onclick=async()=>{try{const z=await deflate(csvText());const out=rewrite(S.u8,b64(z));dl(out,S.name+'_glyph.ogg');say('書き出しました。公式Composerのライブラリから取り込んでください')}catch(e){say(e.message,1)}};
-$('#csv').onclick=()=>dl(csvText(),S.name+'_glyph.csv');
-
-/* ---- プレビュー ---- */
-const cv=$('#cv'),cx=cv.getContext('2d'),CX=160,CY=150,R=133;
-const ARC=[[163,120,20],[14,-30,11],[229,211,5]],Z=[];
-ARC.forEach(([a0,a1,n])=>{for(let k=0;k<n;k++){const c=a0+(a1-a0)*(k+.5)/n,h=Math.abs(a1-a0)/n/2*.78;Z.push([c-h,c+h])}});
-function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTime/(+$('#dt').value/1000))):-1,rd=d=>-d*Math.PI/180;
- cx.setTransform(2,0,0,2,0,0);cx.clearRect(0,0,310,340);cx.shadowBlur=0;
- cx.beginPath();cx.roundRect(2,3,306,420,44);cx.fillStyle='#1a1a1a';cx.fill();
- cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
- cx.lineCap='round';cx.lineWidth=8;
- for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=`rgba(255,255,255,${.1+.9*v})`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
- cx.shadowBlur=0;$('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';requestAnimationFrame(draw)}
-gi('待機中','音源を選択すると解析できます');draw();setInterval(updateGI,80);
-</script></body></html>/* ---- 読み込み ---- */
-$('#f').onchange=async e=>{
- const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
- try{
-  const original=await f.arrayBuffer();
-  const originalU8=new Uint8Array(original);
-  const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
-  const AC=window.AudioContext||window.webkitAudioContext;
-  if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
-  const ctx=new AC();
-  let ab=original;
-  let displayFile=f;
-  S.u8=originalU8;S.ogg=isOgg;
-  progress(2,'音声データを解析用に展開中…',true);
-  S.buf=await ctx.decodeAudioData(ab.slice(0));
-  if(ctx.close)try{await ctx.close()}catch(_){}
-  if(!isOgg){
-    progress(3,'OGG(Vorbis)へ自動変換を開始…',false);
-    const ogg=await convertBufferToOgg(S.buf);
-    S.u8=ogg;S.ogg=true;S.converted=true;
-    ab=ogg.buffer.slice(ogg.byteOffset,ogg.byteOffset+ogg.byteLength);
-    displayFile=new File([ogg],S.name+'.ogg',{type:'audio/ogg'});
-  }
-  $('#au').src=URL.createObjectURL(displayFile);
-  S.fr=null;S.tpl=null;
-  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
-  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
-  try{
-   const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
-   const a=c.find(s=>/^AUTHOR=/i.test(s));
-   if(a){
-    const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
-    const rows=txt.split(/\r?\n/).filter(x=>x.trim());const cols=rows[0].split(',').filter(x=>x!=='').length;
-    S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
-    $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-    msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
-   }
-   const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
-  }catch(_){}
-  gi('準備完了','「点灯データを生成」を押してください。',f.name);
-  $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
-  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
-  progressDone('音源の準備完了');
- }catch(x){
-  $('#progressWrap').classList.remove('show');
-  say('読み込めません: '+(x&&x.message||x),1);
-  gi('エラー','音源を読み込めませんでした。',f.name)
- }
-};
-/* ---- 解析・演出 ---- */
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
-function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]]}}for(let l=2;l<=n;l<<=1){const a=-2*Math.PI/l,wr=Math.cos(a),wi=Math.sin(a);for(let i=0;i<n;i+=l){let cr=1,ci=0;for(let k=0;k<l/2;k++){const u=i+k,v=u+l/2,xr=re[v]*cr-im[v]*ci,xi=re[v]*ci+im[v]*cr;re[v]=re[u]-xr;im[v]=im[u]-xi;re[u]+=xr;im[u]+=xi;const t=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=t}}}}
-async function gen(){
- const b=S.buf,sr=b.sampleRate,dtm=+$('#dt').value,dt=dtm/1000,hop=sr*dt,F=Math.floor(b.length/hop),W=1024,H=W/2;
- const x=new Float32Array(b.length),nc=b.numberOfChannels;for(let c=0;c<nc;c++){const d=b.getChannelData(c);for(let i=0;i<x.length;i++)x[i]+=d[i]/nc}
- const bin=f=>Math.max(1,Math.min(H-1,Math.round(f*W/sr))),rg=(a,c)=>[bin(a),Math.max(bin(a)+1,bin(c))];
- const eb=[...Array(12)].map((_,i)=>bin(50*Math.pow(240,i/11))),rK=[rg(40,150)],rS=[rg(180,450),rg(2000,5000)],rH=[rg(6000,14000)];
- const win=Float32Array.from({length:W},(_,i)=>.5-.5*Math.cos(2*Math.PI*i/W)),re=new Float32Array(W),im=new Float32Array(W),p1=new Float32Array(H),p2=new Float32Array(H),lm=new Float32Array(H);
- const Bd=[...Array(11)].map(()=>new Float32Array(F)),L=new Float32Array(F),fl=[new Float32Array(F),new Float32Array(F),new Float32Array(F)];
- const fx=R=>{let s=0,n=0;for(const[a,c]of R)for(let i=a;i<c;i++){s+=Math.max(0,lm[i]-Math.max(p1[i],p2[i]));n++}return s/n};
- for(let t=0;t<F;t++){const s0=Math.floor(t*hop-W/2);let e=0;for(let i=0;i<W;i++){const v=x[s0+i]||0;re[i]=v*win[i];im[i]=0;e+=v*v}fft(re,im);L[t]=Math.sqrt(e/W);
-  for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
-  for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
-  fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%120==0){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>requestAnimationFrame(r))}}
+  if(t%16==0||t===F-1){const pct=t/Math.max(1,F-1)*100;progress(pct,'音声を解析中…');say(`解析中 ${Math.round(pct)}%`);await new Promise(r=>setTimeout(r,0))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
