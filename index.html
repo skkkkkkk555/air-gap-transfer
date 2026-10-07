@@ -77,16 +77,11 @@ function buildC(v,c,codec){const te=new TextEncoder(),u32=n=>{const a=new Uint8A
 function paginate(pks,serial,seq){const lace=[];pks.forEach(p=>{const full=Math.floor(p.length/255);for(let i=0;i<full;i++)lace.push(255);lace.push(p.length%255)});const data=cat(pks),out=[];let o=0,li=0,cont=0;while(li<lace.length){const seg=lace.slice(li,li+255),len=seg.reduce((a,b)=>a+b,0),h=new Uint8Array(27+seg.length);h.set([79,103,103,83,0,cont]);h.set(serial,14);new DataView(h.buffer).setUint32(18,seq,true);h[26]=seg.length;h.set(seg,27);const pg=cat([h,data.subarray(o,o+len)]);o+=len;new DataView(pg.buffer).setUint32(22,0,true);new DataView(pg.buffer).setUint32(22,crc(pg),true);out.push(pg);seq++;cont=seg[seg.length-1]===255?1:0}return{out,seq}}
 async function rewrite(u,author){const P=pages(u),Hh=headers(u,P),pk=Hh.pk;if(pk.length<2)throw Error('OGGのヘッダーを読めません');const codec=codecFromIdentification(pk[0]);if(!codec)throw Error('Vorbis/Opus以外のOGGには対応していません');if(codec!=='opus')throw Error('Phone (3a) のComposer用OGGはOpus形式が必要です。入力をOpus OGGにしてください');const parsed=parseC(pk[1]),vendor=parsed.vendor,c=parsed.c,title=c.find(s=>/^TITLE=/i.test(s)),album=c.find(s=>/^ALBUM=/i.test(s)),old1=c.find(s=>/^CUSTOM1=/i.test(s));const keep=c.filter(s=>!/^(AUTHOR|CUSTOM1|COMPOSER|CUSTOM2|TITLE|ALBUM)=/i.test(s));keep.push('TITLE='+(title?title.slice(6):S.name));keep.push('ALBUM='+(album?album.slice(6):'CUSTOM'));keep.push('AUTHOR='+author);keep.push('COMPOSER=v1-Asteroids Glyph Composer');keep.push('CUSTOM2=36cols');const user=$('#c1').value.trim();let c1='';if(user)c1=user;else if(old1){try{c1=await inflate(Uint8Array.from(atob(old1.slice(8)),ch=>ch.charCodeAt(0)))}catch(_){c1=''}}keep.push('CUSTOM1='+b64(await deflate(c1)));const serial=u.subarray(P[0].o+14,P[0].o+18),seq0=pageSeq(u,P[1]);const np=paginate([buildC(vendor,keep,codec)],serial,seq0);const parts=[u.slice(P[0].o,P[0].end),...np.out];let seq=np.seq;for(let k=Hh.last+1;k<P.length;k++){const pg=u.slice(P[k].o,P[k].end),dv=new DataView(pg.buffer,pg.byteOffset,pg.byteLength);dv.setUint32(18,seq++,true);dv.setUint32(22,0,true);dv.setUint32(22,crc(pg),true);parts.push(pg)}return cat(parts)}
 /* ---- 読み込み ---- */
-$('#f').onchange=async e=>{
- const f=e.target.files&&e.target.files[0];if(!f)return;S.name=f.name.replace(/\.[^.]+$/,'')||'glyph';S.fr=null;S.F=0;S.u8=null;S.ogg=false;S.codec=null;$('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;ui('読み込み中…','音源を解析しています。画面はそのまま使えます。',f.name);say('読み込み中…');
- try{
-  const ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=S.u8.length>=4&&String.fromCharCode(...S.u8.subarray(0,4))==='OggS';
-  S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);
-  let msg=`${S.buf.duration.toFixed(1)}秒 / ${S.ogg?'OGG':'OGG以外（CSVは出力可）'}`;
-  if(S.ogg){try{const P=pages(S.u8),Hh=headers(S.u8,P),pk=Hh.pk;if(pk.length<2)throw Error('OGGのヘッダーが不足しています');S.codec=codecFromIdentification(pk[0]);const parsed=parseC(pk[1]);const c=parsed.c;const a=c.find(s=>/^AUTHOR=/i.test(s));if(a){try{const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));const rows=txt.split(/\r?\n/).filter(x=>x.trim());if(rows[0]){const cols=rows[0].split(',').filter(x=>x!=='').length;S.tpl={comma:/,\s*$/.test(rows[0]),eol:'\r\n',tail:true};msg+=`\n既存点灯データ: ${rows.length}行×${cols}列`+(cols!==N?`\n列数が${N}ではありません`:'')}}}catch(_){}}const comp=c.find(s=>/^COMPOSER=/i.test(s)),c2=c.find(s=>/^CUSTOM2=/i.test(s));msg+=`\n形式: ${(S.codec||'unknown').toUpperCase()}${comp?` / ${comp}`:''}${c2?` / ${c2}`:''}`;$('#info').textContent=msg}catch(err){$('#info').textContent=msg+`\nメタデータ: ${err.message}`}}
-  $('#go').disabled=false;$('#csv').disabled=false;ui('準備完了',S.ogg?(S.codec==='opus'?'開始を押すと解析します。Opus OGGは3a用書き出しに対応。':'開始できます。書き出しはOpus OGGが必要です。'):'開始できます。CSVを作成できます。',f.name);say('「開始・点灯データを生成」を押してください');
- }catch(x){S.buf=null;$('#info').textContent='';ui('エラー','この音源はブラウザで読み込めません。別のOGG/MP3/WAVを試してください。',f.name);say('読み込めません: '+x.message,1);$('#go').disabled=false}
-};
+$('#f').onchange=async function(e){
+var f=e.target.files&&e.target.files[0];if(!f)return;
+S.name=f.name.replace(/\.[^.]+$/,'')||'glyph';S.fr=null;S.F=0;S.u8=null;S.ogg=false;S.codec=null;
+$('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;ui('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');
+try{var ab=await f.arrayBuffer();S.u8=new Uint8Array(ab);S.ogg=S.u8.length>=4&&String.fromCharCode(S.u8[0],S.u8[1],S.u8[2],S.u8[3])==='OggS';S.buf=await new AudioContext().decodeAudioData(ab.slice(0));$('#au').src=URL.createObjectURL(f);$('#info').textContent=S.buf.duration.toFixed(1)+'秒 / '+(S.ogg?'OGG':'音声ファイル');$('#go').disabled=false;$('#csv').disabled=false;ui('準備完了','開始ボタンを押して36ゾーンを生成できます。',f.name);say('「開始・点灯データを生成」を押してください')}catch(err){S.buf=null;ui('読み込みエラー',err.message,f.name);say('読み込めません: '+err.message,1);$('#go').disabled=false}};
 ['gain','dec','spd','sens','lat'].forEach((id,i)=>$('#'+id).oninput=e=>$('#v'+(i+1)).textContent=(+e.target.value).toFixed(id=='dec'?2:id=='lat'?0:1));
 
 /* ---- 解析・演出 ---- */
@@ -102,7 +97,7 @@ function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j
   for(let i=0;i<H;i++)lm[i]=Math.log1p(60*Math.hypot(re[i],im[i])/(W/4));
   for(let k=0;k<11;k++){const a=eb[k],c=Math.max(a+1,eb[k+1]);let m=0;for(let i=a;i<c;i++)m+=lm[i];Bd[k][t]=m/(c-a)}
   fl[0][t]=fx(rK);fl[1][t]=fx(rS);fl[2][t]=fx(rH);p2.set(p1);p1.set(lm);
-  if(t%300==0){say(\`解析中 \u0024{Math.round(t/F*100)}%\`);await new Promise(r=>setTimeout(r))}}
+  if(t%300==0){say(`解析中 ${Math.round(t/F*100)}%`);await new Promise(r=>setTimeout(r))}}
  const bl=Math.max(1,Math.round(.5/dt));
  const lnorm=col=>{const n=col.length,nb=Math.ceil(n/bl),bm=new Float32Array(nb);for(let t=0;t<n;t++)bm[t/bl|0]=Math.max(bm[t/bl|0],col[t]);const sc=new Float32Array(nb);for(let j=0;j<nb;j++){let m=0;for(let q=Math.max(0,j-4);q<=Math.min(nb-1,j+4);q++)m=Math.max(m,bm[q]);sc[j]=m}
   const so=Float32Array.from(col).sort(),lo=so[Math.floor(n*.2)],gm=so[Math.floor(n*.98)],o=new Float32Array(n);
@@ -124,7 +119,7 @@ function fft(re,im){const n=re.length;for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j
   for(let k=0;k<5;k++){v[31+k]=Math.min(1,bf[k]+sf*.5);bf[k]*=.8}sf*=.75;
   const g=(.4+.6*ls[t])*G;for(let i=0;i<N;i++)raw[t*N+i]=Math.round(4095*Math.pow(Math.max(0,Math.min(1,v[i]*g)),1.8))}
  const sh=Math.round(+$('#lat').value/dtm),fr=new Uint16Array(F*N);for(let t=0;t<F;t++){const s=Math.max(0,Math.min(F-1,t+sh));for(let i=0;i<N;i++)fr[t*N+i]=raw[s*N+i]}
- S.fr=fr;S.F=F;say(\`生成しました(\u0024{F}行×\u0024{N}列)\nキック\u0024{K.filter(Boolean).length}回 / スネア\u0024{Sn.filter(Boolean).length}回 / ハイハット\u0024{Hh.filter(Boolean).length}回を検知\`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
+ S.fr=fr;S.F=F;say(`生成しました(${F}行×${N}列)\nキック${K.filter(Boolean).length}回 / スネア${Sn.filter(Boolean).length}回 / ハイハット${Hh.filter(Boolean).length}回を検知`);$('#ex').disabled=!S.ogg;$('#csv').disabled=false}
 $('#go').onclick=async()=>{if(!S.buf){ui('待機中','先に音源ファイルを選択してください。');say('先に音源ファイルを選択してください',1);$('#f').focus();return}$('#go').disabled=true;$('#ex').disabled=true;$('#csv').disabled=true;ui('解析中','波形・スペクトル・36ゾーンを計算しています。',''+S.name);say('解析を開始…');try{await gen();ui('生成完了',`36ゾーンの点灯データを生成しました（${S.F}行）。`,S.name);$('#ex').disabled=!S.ogg||S.codec!=='opus';$('#csv').disabled=false}catch(e){ui('生成エラー',e.message,S.name);say('生成に失敗: '+e.message,1)}finally{$('#go').disabled=false}};
 
 /* ---- 書き出し ---- */
@@ -144,7 +139,7 @@ function draw(){const au=$('#au'),i=S.fr?Math.min(S.F-1,Math.floor(au.currentTim
  cx.beginPath();rr(cx,2,3,306,326,44);cx.fillStyle='#1a1a1a';cx.fill();
  cx.beginPath();cx.arc(CX,CY,112,0,7);cx.fillStyle='#0f0f0f';cx.fill();
  cx.lineCap='round';cx.lineWidth=8;
- for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=\`rgba(255,255,255,\u0024{.1+.9*v})\`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
+ for(let k=0;k<N;k++){const v=i>=0?S.fr[i*N+k]/4095:0,[p,q]=Z[k];cx.beginPath();cx.arc(CX,CY,R,Math.min(rd(p),rd(q)),Math.max(rd(p),rd(q)));cx.strokeStyle=`rgba(255,255,255,${.1+.9*v})`;if(v>.05){cx.shadowColor='#fff';cx.shadowBlur=16*v}else cx.shadowBlur=0;cx.stroke()}
  cx.shadowBlur=0;$('#cnt').textContent=i>=0?String(i).padStart(5,'0'):'';requestAnimationFrame(draw)}
 ui('待機中','音源を選択すると解析を開始できます。');draw();
 </script></body></html>
