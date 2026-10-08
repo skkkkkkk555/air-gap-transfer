@@ -26,10 +26,12 @@ if(location.search.includes('swclean=1')){
 </script>
 
 <script>
-/* Browser-local Vorbis encoder for playback normalization. */
-var OggVorbisEncoderConfig={memoryInitializerPrefixURL:'https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/'};
+/* Browser-local Vorbis encoder. Use the uncompressed single-file build: no external .mem file is required. */
+window.__oggEncoderLoadError='';
 </script>
-<script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/higuma/ogg-vorbis-encoder-js@master/lib/OggVorbisEncoder.js"
+        onload="window.__oggEncoderLoaded=true"
+        onerror="window.__oggEncoderLoadError='OggVorbisEncoder.js の読み込みに失敗しました'"></script>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#777773;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -379,71 +381,67 @@ function rewrite(u,meta){
 /* ---- 読み込み ---- */
 $('#f').onchange=async e=>{
  const f=e.target.files[0];if(!f)return;
- S.name=f.name.replace(/\.[^.]+$/,'');S.u8=null;S.ogg=false;S.sourceOgg=false;S.converted=false;S.fr=null;S.F=0;S.tpl=null;
- gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込んでいます…',true);
-
- // 再生経路は変換処理から完全に分離。旧正常版と同じく、選択した元音源を先にプレーヤーへ渡す。
- const au=$('#au');
- if(!au)throw Error('音声プレーヤーが見つかりません');
- au.onerror=()=>{
-   const er=au.error,code=er?er.code:0;
-   const detail=code===3?'デコード失敗（破損または非対応コーデック）':code===4?'非対応の音声形式・コーデック':code===2?'データ取得エラー':code===1?'読み込み中断':'不明なメディアエラー';
-   say('再生失敗: '+detail+' / code='+code+' / readyState='+au.readyState,1);
- };
- releaseAudioUrl();
- currentAudioUrl=URL.createObjectURL(f);
- currentAudioMode='original';
- au.src=currentAudioUrl;
- au.load();
-
+ S.name=f.name.replace(/\.[^.]+$/,'');S.converted=false;S.fr=null;S.F=0;S.u8=null;S.ogg=false;
+ releaseAudioUrl();resetNativeAudio($('#au'));
+ $('#au').onerror=()=>{const er=$('#au').error;say('再生失敗: '+(er?'MediaError code '+er.code:'ブラウザが音声を再生できません'),1)};
+ $('#au').onloadedmetadata=()=>{if(Number.isFinite($('#au').duration))say('再生準備完了 / '+$('#au').duration.toFixed(1)+'秒')};
+ gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
  try{
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
-  const isOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
+  const looksOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
+  const sourceIsVorbis=looksOgg&&isOggVorbis(originalU8);
   const AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw Error('このブラウザはWeb Audio APIに対応していません');
+  if(window.__oggEncoderLoadError)throw Error(window.__oggEncoderLoadError);
+  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG(Vorbis)変換エンジンを読み込めません');
   const ctx=new AC();
-  progress(2,'音声を解析用に読み込み中…',true);
+  progress(2,'音声を読み込み中…',true);
   S.buf=await ctx.decodeAudioData(original.slice(0));
   if(ctx.close)try{await ctx.close()}catch(_){}
-
-  if(isOgg){
-   S.u8=originalU8;S.ogg=true;S.sourceOgg=true;
+  if(sourceIsVorbis){
+    S.u8=originalU8;S.ogg=true;
   }else{
-   progress(3,'OGG(Vorbis)へ自動変換を開始…');
-   try{
+    progress(3,'OGG(Vorbis)へ自動変換を開始…');
     const ogg=await convertBufferToOgg(S.buf);
+    progress(96,'変換結果を再生テスト中…');
+    if(!isOggVorbis(ogg))throw Error('生成したOGGが正しいVorbis形式ではありません');
+    const checkCtx=new AC();
+    try{
+      await checkCtx.decodeAudioData(ogg.buffer.slice(ogg.byteOffset,ogg.byteOffset+ogg.byteLength));
+    }catch(x){
+      throw Error('生成したOGGをブラウザでデコードできません: '+(x&&x.message||x));
+    }finally{
+      if(checkCtx.close)try{await checkCtx.close()}catch(_){}
+    }
     S.u8=ogg;S.ogg=true;S.converted=true;
-   }catch(err){
-    S.u8=null;S.ogg=false;S.converted=false;
-    say('再生は可能ですがOGG変換に失敗: '+(err&&err.message||err),1);
-   }
   }
-
-  let msg=S.buf.duration.toFixed(1)+'秒 / 元音源を再生';
-  if(S.converted)msg+='\n内部処理用にOGG(Vorbis)へ自動変換済み';
-  if(isOgg)try{
+  progress(98,'プレーヤーを準備中…');
+  const playBlob=new Blob([S.u8],{type:'audio/ogg'});
+  currentAudioUrl=URL.createObjectURL(playBlob);currentAudioMode='blob';
+  $('#au').src=currentAudioUrl;$('#au').load();S.fr=null;S.tpl=null;
+  let msg=S.buf.duration.toFixed(1)+'秒 / OGG(Vorbis)';
+  if(S.converted)msg+='\\n元の'+f.name+'をOGG(Vorbis)へ自動変換しました';
+  if(sourceIsVorbis)try{
     const P=pages(S.u8),{pk}=headers(S.u8,P);const{c}=parseC(pk[1]);
     const a=c.find(s=>/^AUTHOR=/i.test(s));
     if(a){
       const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
       const rows=txt.split(/\r?\n/).filter(x=>x.trim());
       const cols=rows[0].split(',').filter(x=>x!=='').length;
-      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
+      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
       $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-      msg+='\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
     }
-    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
-
   gi('準備完了','「点灯データを生成」を押してください。',f.name);
-  $('#info').textContent=msg;
-  $('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
-  say('「点灯データを生成」を押してください');
+  $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
+  say(S.converted?'変換済みOGGを読み込みました。「点灯データを生成」を押してください':'「点灯データを生成」を押してください');
   progressDone('音源の準備完了');
  }catch(x){
   $('#progressWrap').classList.remove('show');
-  say('解析用読み込み失敗: '+(x&&x.message||x),1);
-  gi('エラー','解析用に音源を読み込めませんでした。プレーヤーは元音源を保持しています。',f.name)
+  say('読み込めません: '+(x&&x.message||x),1);
+  gi('エラー','音源を読み込めませんでした。',f.name);
  }
 };
 /* ---- 解析・演出 ---- */
