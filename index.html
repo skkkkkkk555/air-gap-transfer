@@ -25,7 +25,11 @@ if(location.search.includes('swclean=1')){
 })();
 </script>
 
-<script src="./ogg-encoder-loader.js"></script>
+<script>
+// OGG Vorbis encoder is loaded lazily from the CSP-allowed jsDelivr /npm/ path.
+window.__oggEncoderLoadError='';
+window.__oggEncoderReadyPromise=null;
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Doto:wght@800&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e9e8e4;--card:#f5f4f0;--ink:#141414;--mut:#6c6b66;--acc:#777773;--line:#c9c7c0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -282,43 +286,53 @@ const dataUrlFallback=async(file,au)=>{
 };
 
 window.addEventListener('error',e=>{
- const m=e&&e.error&&e.error.message||e&&e.message||'不明なJavaScriptエラー';
- try{say('実行エラー: '+m,1);gi('エラー','アプリの実行中にエラーが発生しました。',S.name)}catch(_){}
+ const raw=e&&e.error&&e.error.message||e&&e.message||e&&e.error||'不明なJavaScriptエラー';
+ const m=typeof raw==='string'?raw:JSON.stringify(raw);
+ const where=e&&e.filename?(' / '+e.filename.split('/').pop()+(e.lineno?':'+e.lineno:'')):'';
+ try{say('実行エラー: '+m+where,1);gi('エラー','アプリの実行中にエラーが発生しました。',S.name)}catch(_){}
 });
 window.addEventListener('unhandledrejection',e=>{
- const m=e&&e.reason&&e.reason.message||String(e&&e.reason||'不明なPromiseエラー');
- try{say('実行エラー: '+m,1);gi('エラー','非同期処理でエラーが発生しました。',S.name)}catch(_){}
+ const raw=e&&e.reason&&e.reason.message||e&&e.reason||'不明なPromiseエラー';
+ const m=typeof raw==='string'?raw:JSON.stringify(raw);
+ try{say('実行エラー: '+m,1);gi('エラー','アプリの実行中にエラーが発生しました。',S.name)}catch(_){}
 });
 const cat=a=>{let n=0;a.forEach(x=>n+=x.length);const o=new Uint8Array(n);let p=0;a.forEach(x=>{o.set(x,p);p+=x.length});return o};
 const b64=u=>{let s='';for(let i=0;i<u.length;i+=8192)s+=String.fromCharCode.apply(null,u.subarray(i,i+8192));return btoa(s)};
 const deflate=async t=>new Uint8Array(await new Response(new Blob([t]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
 const inflate=async b=>new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
 
-/* ---- 音源→Vorbis OGG変換（ブラウザ内完結） ---- */
-function ensureOggEncoder(){
-  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG変換エンジンを読み込めません');
-  return window.OggVorbisEncoder;
+/* ---- 音源→Vorbis OGG変換（CSP許可済みの jsDelivr /npm/） ---- */
+async function ensureOggEncoder(){
+  if(window.__oggEncoderReadyPromise)return window.__oggEncoderReadyPromise;
+  window.__oggEncoderReadyPromise=(async()=>{
+    progress(1,'OGG(Vorbis)エンコーダーを読み込み中…',true);
+    try{
+      const mod=await import('https://cdn.jsdelivr.net/npm/@audio/encode-ogg@1.2.2/+esm');
+      const fn=mod&&((typeof mod.default==='function')?mod.default:(typeof mod.ogg==='function'?mod.ogg:null));
+      if(typeof fn!=='function')throw Error('OGG(Vorbis)エンコーダーのAPIを取得できませんでした');
+      window.__oggEncoderFn=fn;
+      window.__oggEncoderLoadError='';
+      return fn;
+    }catch(e){
+      window.__oggEncoderLoadError=(e&&e.message)||String(e);
+      throw Error('OGG(Vorbis)エンコーダーを読み込めません: '+window.__oggEncoderLoadError);
+    }
+  })();
+  return window.__oggEncoderReadyPromise;
 }
 async function convertBufferToOgg(audioBuffer){
-  const Encoder=ensureOggEncoder();
+  const encodeOgg=await ensureOggEncoder();
   const channels=Math.min(2,Math.max(1,audioBuffer.numberOfChannels));
   const sampleRate=audioBuffer.sampleRate,total=audioBuffer.length;
   progress(4,'OGG(Vorbis)変換を開始…');
   await new Promise(r=>setTimeout(r,0));
-  const encoder=new Encoder(sampleRate,channels,.5);
-  const chunkSize=Math.max(4096,Math.floor(sampleRate*.25));
-  for(let pos=0;pos<total;pos+=chunkSize){
-    const end=Math.min(total,pos+chunkSize);
-    const data=[];
-    for(let ch=0;ch<channels;ch++)data.push(audioBuffer.getChannelData(ch).subarray(pos,end));
-    encoder.encode(data);
-    progress(5+end/Math.max(1,total)*90,'OGG(Vorbis)へ変換中…');
-    await new Promise(r=>setTimeout(r,0));
-  }
-  const blob=encoder.finish('audio/ogg');
-  if(!blob||blob.size<64)throw Error('OGG変換結果が空です');
-  progressDone('OGG変換完了');
-  return new Uint8Array(await blob.arrayBuffer());
+  const channelData=[];
+  for(let ch=0;ch<channels;ch++)channelData.push(audioBuffer.getChannelData(ch));
+  const bytes=await encodeOgg(channelData,{sampleRate,channels,quality:5});
+  progress(96,'変換結果を検査中…');
+  const u8=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+  if(u8.length<64)throw Error('OGG変換結果が空です');
+  return u8;
 }
 /* ---- OGG ---- */
 const T=(()=>{const t=new Uint32Array(256);for(let i=0;i<256;i++){let r=i<<24;for(let j=0;j<8;j++)r=r&0x80000000?(r<<1)^0x04c11db7:r<<1;t[i]=r>>>0}return t})();
@@ -406,10 +420,6 @@ $('#f').onchange=async e=>{
  };
  gi('読み込み中…','音源を読み込んでいます。',f.name);say('読み込み中…');progress(0,'音源を読み込み中…',true);
  try{
-  if(window.__oggEncoderReady)await window.__oggEncoderReady;
-  if(window.__oggEncoderLoadError)throw Error(window.__oggEncoderLoadError);
-  if(typeof window.OggVorbisEncoder!=='function')throw Error('OGG(Vorbis)変換エンジンを読み込めません');
-
   const original=await f.arrayBuffer(),originalU8=new Uint8Array(original);
   const looksOgg=String.fromCharCode(...originalU8.subarray(0,4))==='OggS';
   const sourceIsVorbis=looksOgg&&isOggVorbis(originalU8);
@@ -423,6 +433,7 @@ $('#f').onchange=async e=>{
     S.u8=originalU8;S.ogg=true;
   }else{
     progress(3,'OGG(Vorbis)へ自動変換を開始…');
+    await ensureOggEncoder();
     const ogg=await convertBufferToOgg(S.buf);
     progress(96,'変換結果を再生テスト中…');
     if(!isOggVorbis(ogg))throw Error('生成したOGGが正しいVorbis形式ではありません');
