@@ -428,11 +428,11 @@ $('#f').onchange=async e=>{
       const txt=await inflate(Uint8Array.from(atob(a.slice(7)),ch=>ch.charCodeAt(0)));
       const rows=txt.split(/\r?\n/).filter(x=>x.trim());
       const cols=rows[0].split(',').filter(x=>x!=='').length;
-      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\\r\\n')?'\\r\\n':'\\n',tail:/\\n$/.test(txt)};
+      S.tpl={comma:/,\s*$/.test(rows[0]),eol:txt.includes('\r\n')?'\r\n':'\n',tail:/\n$/.test(txt)};
       $('#dt').value=(S.buf.duration/rows.length*1000).toFixed(3);
-      msg+='\\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\\n列数が'+N+'ではありません。3a以外の可能性があります':'');
+      msg+='\n既存の点灯データを検出: '+rows.length+'行×'+cols+'列 → 1行='+$('#dt').value+'ミリ秒に合わせました'+(cols!==N?'\n列数が'+N+'ではありません。3a以外の可能性があります':'');
     }
-    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\\nCUSTOM1タグを検出(そのまま引き継ぎます)';
+    const o1=c.find(s=>/^CUSTOM1=/i.test(s));if(o1)msg+='\nCUSTOM1タグを検出(そのまま引き継ぎます)';
   }catch(_){}
   gi('準備完了','「点灯データを生成」を押してください。',f.name);
   $('#info').textContent=msg;$('#go').disabled=false;$('#ex').disabled=true;$('#csv').disabled=true;
