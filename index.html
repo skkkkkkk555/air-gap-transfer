@@ -364,31 +364,51 @@ function makePacketPages(packet,serial,seq,flags,granule){
  return{pages:out,nextSeq:seq};
 }
 async function validateComposition(u){
- const P=pages(u),ps=packets(u,P);if(P.length<3||ps.length<3)throw Error('OGGページ/音声パケット数が不足しています');
- const td=new TextDecoder(),head=td.decode(ps[0].data.subarray(0,8));if(head!=='OpusHead')throw Error('音声コーデックがOpusではありません');
- if(td.decode(ps[1].data.subarray(0,8))!=='OpusTags')throw Error('OpusTagsがありません');
- const parsed=parseC(ps[1].data),map=new Map();for(const x of parsed.c){const k=x.indexOf('=');if(k>0)map.set(x.slice(0,k).toUpperCase(),x.slice(k+1))}
+ const P=pages(u),ps=packets(u,P);
+ if(P.length<3||ps.length<3)throw Error('OGGページ/音声パケット数が不足しています');
+ const td=new TextDecoder();
+ if(td.decode(ps[0].data.subarray(0,7))!=='\\u0001vorbis')throw Error('音声コーデックがVorbisではありません');
+ if(td.decode(ps[1].data.subarray(0,8))!=='\\u0003vorbis')throw Error('Vorbisコメントヘッダーがありません');
+ const parsed=parseC(ps[1].data),map=new Map();
+ for(const x of parsed.c){const k=x.indexOf('=');if(k>0)map.set(k>0?x.slice(0,k).toUpperCase():x,x.slice(k+1))}
  for(const k of ['TITLE','ALBUM','AUTHOR','COMPOSER','CUSTOM1','CUSTOM2'])if(!map.has(k))throw Error('必須タグ不足: '+k);
  if(map.get('COMPOSER')!=='v1-Asteroids Glyph Composer')throw Error('COMPOSERが3a用ではありません');
  if(map.get('CUSTOM2')!=='36cols')throw Error('CUSTOM2が36colsではありません');
- const author=await inflate(Uint8Array.from(atob(map.get('AUTHOR').replace(/\s/g,'')),x=>x.charCodeAt(0)));
- const rows=author.split(/\r\n|\n/).filter(x=>x.length);if(!rows.length)throw Error('AUTHORデータが空です');
+ const author=await inflate(Uint8Array.from(atob(map.get('AUTHOR').replace(/\\s/g,'')),x=>x.charCodeAt(0)));
+ const rows=author.split(/\\r\\n|\\n/).filter(x=>x.length);if(!rows.length)throw Error('AUTHORデータが空です');
  for(const row of rows){const v=row.split(',').filter(x=>x!=='');if(v.length!==36)throw Error('AUTHORの列数が36ではありません');for(const x of v){const n=Number(x);if(!Number.isInteger(n)||n<0||n>4095)throw Error('AUTHOR値が0〜4095の範囲外です')}}
- const custom=await inflate(Uint8Array.from(atob(map.get('CUSTOM1').replace(/\s/g,'')),x=>x.charCodeAt(0)));if(custom!==','&&!/^(?:\d+-\d+,)*$/.test(custom))throw Error('CUSTOM1形式が不正です');
- let expectedSeq=0;for(const p of P){const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength),expected=d.getUint32(22,true);if(d.getUint32(18,true)!==expectedSeq++)throw Error('OGGページ番号が連続していません');d.setUint32(22,0,true);if(expected!==crc(q))throw Error('OGG CRC検証失敗')}
- if((new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[0].o+5)&2)===0)throw Error('OGG BOSフラグがありません');
- if((new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[P.length-1].o+5)&4)===0)throw Error('OGG EOSフラグがありません');
+ const custom=await inflate(Uint8Array.from(atob(map.get('CUSTOM1').replace(/\\s/g,'')),x=>x.charCodeAt(0)));
+ if(custom!==','&&!/^(?:\\d+-\\d+,)*$/.test(custom))throw Error('CUSTOM1形式が不正です');
+ let expectedSeq=0;
+ for(const p of P){
+   const q=u.slice(p.o,p.end),d=new DataView(q.buffer,q.byteOffset,q.byteLength),expected=d.getUint32(22,true);
+   if(d.getUint32(18,true)!==expectedSeq++)throw Error('OGGページ番号が連続していません');
+   d.setUint32(22,0,true);if(expected!==crc(q))throw Error('OGG CRC検証失敗');
+ }
+ const firstFlags=new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[0].o+5);
+ const lastFlags=new DataView(u.buffer,u.byteOffset,u.byteLength).getUint8(P[P.length-1].o+5);
+ if((firstFlags&2)===0)throw Error('OGG BOSフラグがありません');
+ if((lastFlags&4)===0)throw Error('OGG EOSフラグがありません');
  return{pages:P.length,rows:rows.length,durationPackets:ps.length};
 }
 function rewrite(u,meta){
- const P=pages(u),ps=packets(u,P);if(ps.length<3)throw Error('OGGの構造を読めません');
- const td=new TextDecoder();if(td.decode(ps[0].data.subarray(0,8))!=='OpusHead')throw Error('Composer互換化にはOgg Opus音源が必要です');
+ const P=pages(u),ps=packets(u);
+ if(ps.length<3)throw Error('OGGの構造を読めません');
+ const td=new TextDecoder();
+ if(td.decode(ps[0].data.subarray(0,7))!=='\\u0001vorbis')throw Error('Vorbis形式のOGGのみ対応です');
  if(ps[2].startPage!==2)throw Error('特殊なOGGヘッダー配置のため安全に書き換えできません');
- const parsed=parseC(ps[1].data),keep=parsed.c.filter(s=>!/^(TITLE|ALBUM|AUTHOR|COMPOSER|CUSTOM1|CUSTOM2)=/i.test(s));
+ const parsed=parseC(ps[1].data);
+ if(parsed.opus)throw Error('Composer互換化にはVorbis形式のOGGが必要です');
+ const keep=parsed.c.filter(s=>!/^(TITLE|ALBUM|AUTHOR|COMPOSER|CUSTOM1|CUSTOM2)=/i.test(s));
  for(const s of ['TITLE='+meta.title,'ALBUM='+meta.album,'AUTHOR='+meta.author,'COMPOSER='+meta.composer,'CUSTOM1='+meta.custom1,'CUSTOM2='+meta.custom2])keep.push(s);
- const serial=u.subarray(P[0].o+14,P[0].o+18),first=makePacketPages(ps[0].data,serial,0,2,0),tags=makePacketPages(buildC(parsed.vendor,keep,parsed.opus),serial,first.nextSeq,0,0);
+ const serial=u.subarray(P[0].o+14,P[0].o+18);
+ const first=makePacketPages(ps[0].data,serial,0,2,0);
+ const tags=makePacketPages(buildC(parsed.vendor,keep,false),serial,first.nextSeq,0,0);
  const parts=[...first.pages,...tags.pages],start=ps[2].startPage;let seq=tags.nextSeq;
- for(let k=start;k<P.length;k++){const q=u.slice(P[k].o,P[k].end),d=new DataView(q.buffer,q.byteOffset,q.byteLength);d.setUint32(18,seq++,true);d.setUint32(22,0,true);d.setUint32(22,crc(q),true);parts.push(q)}
+ for(let k=start;k<P.length;k++){
+   const q=u.slice(P[k].o,P[k].end),d=new DataView(q.buffer,q.byteOffset,q.byteLength);
+   d.setUint32(18,seq++,true);d.setUint32(22,0,true);d.setUint32(22,crc(q),true);parts.push(q);
+ }
  return cat(parts);
 }
 /* ---- 読み込み ---- */
